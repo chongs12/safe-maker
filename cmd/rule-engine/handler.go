@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"regexp"
 	"strings"
 
@@ -14,11 +15,15 @@ type RuleEngineServiceImpl struct{}
 // Scan 处理内容扫描请求
 // 使用简单的关键词匹配和正则表达式进行快速过滤
 func (s *RuleEngineServiceImpl) Scan(ctx context.Context, req *safeflow.ScanRequest) (resp *safeflow.ScanResponse, err error) {
+	log.Printf("[RuleEngine] 收到请求: ID=%s, Content=%s", req.RequestId, req.Content)
+
 	// 1. 定义敏感词库和正则模式
 	// 在实际生产中，这些应该从配置中心或数据库加载，并使用 AC 自动机等高效算法
 	sensitiveWords := []string{
 		"fuck", "gambling", "terror", "bomb", "kill", "suicide",
 		"casino", "drugs", "heroin",
+		"兼职", "刷单", "加微信", "博彩", "赌博", "炸弹", "自杀", "毒品", "海洛因",
+		"高薪", "日入", "不限经验",
 	}
 	emailRegex := regexp.MustCompile(`[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}`)
 	phoneRegex := regexp.MustCompile(`\b\d{11}\b`) // 简单的中国手机号匹配

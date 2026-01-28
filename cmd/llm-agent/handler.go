@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/safeflow-project/safeflow/internal/agent"
+	"github.com/safeflow-project/safeflow/internal/common"
 	safeflow "github.com/safeflow-project/safeflow/kitex_gen/safeflow"
 )
 
@@ -15,9 +16,9 @@ type LLMAgentServiceImpl struct {
 }
 
 // NewLLMAgentServiceImpl 创建新的服务实现实例
-func NewLLMAgentServiceImpl(ctx context.Context) *LLMAgentServiceImpl {
+func NewLLMAgentServiceImpl(ctx context.Context, cfg *common.Config) *LLMAgentServiceImpl {
 	// 初始化 Eino Agent (包含图编排、模型加载等)
-	a, err := agent.NewEinoAgent(ctx)
+	a, err := agent.NewEinoAgent(ctx, cfg)
 	if err != nil {
 		// 在生产环境中，应该优雅地处理错误
 		// 这里如果配置缺失或初始化失败，我们选择快速失败 (Panic)

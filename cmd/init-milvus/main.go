@@ -9,6 +9,7 @@ import (
 	ark_embed "github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
+	"github.com/safeflow-project/safeflow/internal/common"
 )
 
 // Case 定义案例数据结构
@@ -20,19 +21,21 @@ type Case struct {
 
 const (
 	CollectionName = "sensitive_cases" // 集合名称
-	Dim            = 1024              // 向量维度 (Ark embedding 为 1024)
+	Dim            = 4096              // 向量维度 (Ark embedding 为 4096)
 )
 
 func main() {
 	ctx := context.Background()
 
-	// 1. 连接 Milvus 向量数据库
-	milvusAddr := os.Getenv("MILVUS_ADDR")
-	if milvusAddr == "" {
-		milvusAddr = "localhost:19530"
+	// 0. 加载配置
+	cfg, err := common.LoadConfig()
+	if err != nil {
+		log.Fatal("加载配置失败:", err)
 	}
+
+	// 1. 连接 Milvus 向量数据库
 	c, err := client.NewClient(ctx, client.Config{
-		Address: milvusAddr,
+		Address: cfg.MilvusAddr,
 	})
 	if err != nil {
 		log.Fatal("连接 milvus 失败:", err)
@@ -41,8 +44,8 @@ func main() {
 
 	// 2. 初始化 Embedder (用于将文本转换为向量)
 	emb, err := ark_embed.NewEmbedder(ctx, &ark_embed.EmbeddingConfig{
-		APIKey: os.Getenv("ARK_API_KEY"),
-		Model:  os.Getenv("ARK_EMBEDDING_MODEL"),
+		APIKey: cfg.ArkAPIKey,
+		Model:  cfg.ArkEmbeddingModel,
 	})
 	if err != nil {
 		log.Fatal("初始化 embedder 失败:", err)
@@ -76,7 +79,7 @@ func main() {
 				Name:     "vector",
 				DataType: entity.FieldTypeFloatVector,
 				TypeParams: map[string]string{
-					"dim": "1024", // 必须与 Embedding 模型维度一致
+					"dim": "4096", // 必须与 Embedding 模型维度一致
 				},
 			},
 			{
@@ -103,7 +106,7 @@ func main() {
 
 	// 4. 创建索引 (Index)
 	// 使用 IVF_FLAT 索引，L2 (欧氏距离)
-	idx, err := entity.NewIndexIvfFlat(entity.L2, 1024)
+	idx, err := entity.NewIndexIvfFlat(entity.L2, Dim)
 	if err != nil {
 		log.Fatal("创建索引实体失败:", err)
 	}
@@ -139,6 +142,7 @@ func main() {
 	if err != nil {
 		log.Fatal("embedding 失败:", err)
 	}
+	log.Printf("Embedding 成功: 输入 %d 条, 返回 %d 条, 维度 %d", len(texts), len(embeddings), len(embeddings[0]))
 
 	// 转换 [][]float64 为 [][]float32 (Milvus SDK 要求 float32)
 	for _, v64 := range embeddings {
@@ -151,7 +155,7 @@ func main() {
 
 	// 插入数据
 	_, err = c.Insert(ctx, CollectionName, "",
-		entity.NewColumnFloatVector("vector", 1024, vectors),
+		entity.NewColumnFloatVector("vector", Dim, vectors),
 		entity.NewColumnVarChar("content", contents),
 		entity.NewColumnVarChar("label", labels),
 	)

@@ -18,7 +18,7 @@ func main() {
 	addr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+cfg.LLMAgentPort)
 
 	// 初始化服务实现 (包含 Eino Agent 的初始化)
-	impl := NewLLMAgentServiceImpl(context.Background())
+	impl := NewLLMAgentServiceImpl(context.Background(), cfg)
 
 	// 创建 Kitex 服务端
 	svr := safeflow.NewServer(impl, server.WithServiceAddr(addr))

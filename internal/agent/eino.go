@@ -3,8 +3,8 @@ package agent
 import (
 	"context"
 	"encoding/json"
+
 	"log"
-	"os"
 
 	ark_embed "github.com/cloudwego/eino-ext/components/embedding/ark"
 	ark_model "github.com/cloudwego/eino-ext/components/model/ark"
@@ -15,6 +15,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
+	"github.com/safeflow-project/safeflow/internal/common"
 )
 
 // EinoAgent 封装了 Eino 运行图
@@ -34,12 +35,12 @@ type CheckPoliticalArgs struct {
 }
 
 // NewEinoAgent 初始化并构建 Eino Agent
-func NewEinoAgent(ctx context.Context) (*EinoAgent, error) {
+func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
 	// 1. 初始化 Embedding (用于 Retriever)
 	// 使用火山引擎 Ark Embedding 服务
 	emb, err := ark_embed.NewEmbedder(ctx, &ark_embed.EmbeddingConfig{
-		APIKey: os.Getenv("ARK_API_KEY"),
-		Model:  os.Getenv("ARK_EMBEDDING_MODEL"),
+		APIKey: cfg.ArkAPIKey,
+		Model:  cfg.ArkEmbeddingModel,
 	})
 	if err != nil {
 		log.Printf("警告: 初始化 embedding 失败: %v", err)
@@ -51,7 +52,7 @@ func NewEinoAgent(ctx context.Context) (*EinoAgent, error) {
 	if emb != nil {
 		retriever, err = milvus2.NewRetriever(ctx, &milvus2.RetrieverConfig{
 			ClientConfig: &milvusclient.ClientConfig{
-				Address: os.Getenv("MILVUS_ADDR"),
+				Address: cfg.MilvusAddr,
 			},
 			Collection: "sensitive_cases",                          // 集合名称
 			TopK:       3,                                          // 返回前 3 个最相似结果
@@ -114,8 +115,8 @@ func NewEinoAgent(ctx context.Context) (*EinoAgent, error) {
 	// 4. 初始化 Chat Model (Ark)
 	// 使用火山引擎 Ark 大语言模型服务
 	chatModel, err := ark_model.NewChatModel(ctx, &ark_model.ChatModelConfig{
-		APIKey: os.Getenv("ARK_API_KEY"),
-		Model:  os.Getenv("ARK_MODEL_ID"),
+		APIKey: cfg.ArkAPIKey,
+		Model:  cfg.ArkModelID,
 	})
 	if err != nil {
 		return nil, err
@@ -181,11 +182,13 @@ func NewEinoAgent(ctx context.Context) (*EinoAgent, error) {
 
 // Run 执行 Agent 逻辑
 func (a *EinoAgent) Run(ctx context.Context, content string) (string, error) {
+	log.Printf("[EinoAgent] 收到审核内容: %s", content)
+
 	// 构造输入消息
 	input := []*schema.Message{
 		{
 			Role:    schema.System,
-			Content: "你是一个内容安全审核员。请分析用户的输入。如有必要，请使用工具。请以 JSON 格式回复：{\"action\": \"allow\"|\"block\"|\"review\", \"reason\": \"...\"}。",
+			Content: "你是一个内容安全审核员。请分析用户的输入。用户输入可能包含中文、英文或其他语言。请不要认为它们是乱码，请仔细分析其语义，遇到不熟悉的名称和事件需要搜索相关资讯来判断。\n如有必要，请使用工具。\n\n请严格以 JSON 格式回复，不要包含 markdown 标记：\n{\"action\": \"allow\"|\"block\"|\"review\", \"reason\": \"简短说明原因\"}。",
 		},
 		{
 			Role:    schema.User,
