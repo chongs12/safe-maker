@@ -1,0 +1,11 @@
+NATS_URL: nats://localhost:4222
+MYSQL_DSN: root:root@tcp(localhost:3306)/safeflow?charset=utf8mb4&parseTime=True&loc=Local
+GATEWAY_PORT: "8080"
+RULE_ENGINE_PORT: "8881"
+LLM_AGENT_PORT: "8882"
+RULE_ENGINE_ADDR: localhost:8881
+LLM_AGENT_ADDR: localhost:8882
+ARK_API_KEY: "8de95fa8-fc30-4f28-b254-55afb5fb7505"
+ARK_MODEL_ID: "doubao-seed-1-8-251228"
+ARK_EMBEDDING_MODEL: "doubao-embedding-large-text-240915"
+MILVUS_ADDR: localhost:19530
