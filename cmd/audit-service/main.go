@@ -63,7 +63,7 @@ func main() {
 		}
 
 		// 构建日志对象
-		logEntry := AuditLog{
+		logEntry := common.AuditLog{
 			RequestID: event.RequestID,
 			UserID:    event.UserID,
 			Action:    event.Action,

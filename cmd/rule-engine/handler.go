@@ -5,12 +5,53 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/safeflow-project/safeflow/internal/common"
 	safeflow "github.com/safeflow-project/safeflow/kitex_gen/safeflow"
+	"gorm.io/gorm"
 )
 
 // RuleEngineServiceImpl 实现 RuleEngineService 接口
-type RuleEngineServiceImpl struct{}
+type RuleEngineServiceImpl struct {
+	db          *gorm.DB
+	rules       []common.Rule
+	mu          sync.RWMutex
+	lastRefresh time.Time
+}
+
+// NewRuleEngineServiceImpl 创建实例
+func NewRuleEngineServiceImpl(db *gorm.DB) *RuleEngineServiceImpl {
+	s := &RuleEngineServiceImpl{
+		db: db,
+	}
+	// 初始加载规则
+	s.loadRules()
+	// 启动后台刷新 (每分钟)
+	go s.refreshRulesLoop()
+	return s
+}
+
+func (s *RuleEngineServiceImpl) loadRules() {
+	var rules []common.Rule
+	if err := s.db.Where("is_enabled = ?", true).Order("priority desc").Find(&rules).Error; err != nil {
+		log.Printf("加载规则失败: %v", err)
+		return
+	}
+	s.mu.Lock()
+	s.rules = rules
+	s.lastRefresh = time.Now()
+	s.mu.Unlock()
+	log.Printf("已加载 %d 条规则", len(rules))
+}
+
+func (s *RuleEngineServiceImpl) refreshRulesLoop() {
+	ticker := time.NewTicker(1 * time.Minute)
+	for range ticker.C {
+		s.loadRules()
+	}
+}
 
 // Scan 处理内容扫描请求
 // 使用简单的关键词匹配和正则表达式进行快速过滤
