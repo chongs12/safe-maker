@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/cloudwego/kitex/server"
@@ -56,7 +60,36 @@ func main() {
 	// 注入 RuleEngineServiceImpl 实现
 	svr := safeflow.NewServer(NewRuleEngineServiceImpl(db), server.WithServiceAddr(addr))
 
+	// 服务注册到 Etcd (如果启用)
+	var registry *common.ServiceRegistry
+	if cfg.UseEtcdRegistry && len(cfg.EtcdEndpoints) > 0 {
+		registry, err = common.NewServiceRegistry(cfg.EtcdEndpoints, logger)
+		if err != nil {
+			logger.Fatal("连接 Etcd 失败", zap.Error(err))
+		}
+		defer registry.Close()
+
+		// 注册服务
+		serviceAddr := "localhost:" + cfg.RuleEnginePort
+		if err := registry.Register(context.Background(), "safeflow.rule-engine", serviceAddr, 10); err != nil {
+			logger.Fatal("注册服务失败", zap.Error(err))
+		}
+
+		// 优雅退出时注销服务
+		go func() {
+			sigChan := make(chan os.Signal, 1)
+			signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+			<-sigChan
+			logger.Info("正在注销服务...")
+			registry.Deregister(context.Background(), "safeflow.rule-engine", serviceAddr)
+			os.Exit(0)
+		}()
+
+		logger.Info("服务已注册到 Etcd", zap.Strings("endpoints", cfg.EtcdEndpoints))
+	}
+
 	// 启动服务
+	logger.Info("规则引擎服务启动", zap.String("addr", addr.String()))
 	err = svr.Run()
 
 	if err != nil {

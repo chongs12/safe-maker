@@ -56,16 +56,56 @@ func main() {
 	defer nc.Close()
 
 	// 4. 初始化 Kitex 客户端 (RPC)
-	// 初始化规则引擎服务客户端
-	ruleClient, err := ruleengineservice.NewClient("safeflow.rule-engine", client.WithHostPorts(cfg.RuleEngineAddr))
-	if err != nil {
-		logger.Fatal("初始化规则引擎客户端失败", zap.Error(err))
-	}
+	var ruleClient ruleengineservice.Client
+	var llmClient llmagentservice.Client
 
-	// 初始化 LLM Agent 服务客户端
-	llmClient, err := llmagentservice.NewClient("safeflow.llm-agent", client.WithHostPorts(cfg.LLMAgentAddr))
-	if err != nil {
-		logger.Fatal("初始化 LLM 客户端失败", zap.Error(err))
+	if cfg.UseEtcdRegistry && len(cfg.EtcdEndpoints) > 0 {
+		// 使用 Etcd 服务发现
+		logger.Info("使用 Etcd 服务发现", zap.Strings("endpoints", cfg.EtcdEndpoints))
+
+		discovery, err := common.NewServiceDiscovery(cfg.EtcdEndpoints, logger)
+		if err != nil {
+			logger.Fatal("连接 Etcd 失败", zap.Error(err))
+		}
+		defer discovery.Close()
+
+		// 发现规则引擎服务
+		ruleAddrs, err := discovery.Discover(context.Background(), "safeflow.rule-engine")
+		if err != nil {
+			logger.Fatal("发现规则引擎服务失败", zap.Error(err))
+		}
+		logger.Info("发现规则引擎服务", zap.Strings("addrs", ruleAddrs))
+
+		// 发现 LLM Agent 服务
+		llmAddrs, err := discovery.Discover(context.Background(), "safeflow.llm-agent")
+		if err != nil {
+			logger.Fatal("发现 LLM Agent 服务失败", zap.Error(err))
+		}
+		logger.Info("发现 LLM Agent 服务", zap.Strings("addrs", llmAddrs))
+
+		// 初始化客户端
+		ruleClient, err = ruleengineservice.NewClient("safeflow.rule-engine", client.WithHostPorts(ruleAddrs...))
+		if err != nil {
+			logger.Fatal("初始化规则引擎客户端失败", zap.Error(err))
+		}
+
+		llmClient, err = llmagentservice.NewClient("safeflow.llm-agent", client.WithHostPorts(llmAddrs...))
+		if err != nil {
+			logger.Fatal("初始化 LLM 客户端失败", zap.Error(err))
+		}
+	} else {
+		// 使用静态地址
+		logger.Info("使用静态服务地址", zap.String("rule_engine", cfg.RuleEngineAddr), zap.String("llm_agent", cfg.LLMAgentAddr))
+
+		ruleClient, err = ruleengineservice.NewClient("safeflow.rule-engine", client.WithHostPorts(cfg.RuleEngineAddr))
+		if err != nil {
+			logger.Fatal("初始化规则引擎客户端失败", zap.Error(err))
+		}
+
+		llmClient, err = llmagentservice.NewClient("safeflow.llm-agent", client.WithHostPorts(cfg.LLMAgentAddr))
+		if err != nil {
+			logger.Fatal("初始化 LLM 客户端失败", zap.Error(err))
+		}
 	}
 
 	// 5. 启动 Gin Web 服务器
