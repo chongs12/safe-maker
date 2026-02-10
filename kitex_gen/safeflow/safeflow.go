@@ -110,6 +110,174 @@ var fieldIDToName_ScanResponse = map[int16]string{
 	4: "source",
 }
 
+type Label struct {
+	Name       string  `thrift:"name,1" frugal:"1,default,string" json:"name"`
+	Confidence float64 `thrift:"confidence,2" frugal:"2,default,double" json:"confidence"`
+}
+
+func NewLabel() *Label {
+	return &Label{}
+}
+
+func (p *Label) InitDefault() {
+}
+
+func (p *Label) GetName() (v string) {
+	return p.Name
+}
+
+func (p *Label) GetConfidence() (v float64) {
+	return p.Confidence
+}
+func (p *Label) SetName(val string) {
+	p.Name = val
+}
+func (p *Label) SetConfidence(val float64) {
+	p.Confidence = val
+}
+
+func (p *Label) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Label(%+v)", *p)
+}
+
+var fieldIDToName_Label = map[int16]string{
+	1: "name",
+	2: "confidence",
+}
+
+type ImageModerationRequest struct {
+	RequestId string `thrift:"request_id,1" frugal:"1,default,string" json:"request_id"`
+	ImageUrl  string `thrift:"image_url,2" frugal:"2,default,string" json:"image_url"`
+	ImageData []byte `thrift:"image_data,3" frugal:"3,default,binary" json:"image_data"`
+	Scene     string `thrift:"scene,4" frugal:"4,default,string" json:"scene"`
+}
+
+func NewImageModerationRequest() *ImageModerationRequest {
+	return &ImageModerationRequest{}
+}
+
+func (p *ImageModerationRequest) InitDefault() {
+}
+
+func (p *ImageModerationRequest) GetRequestId() (v string) {
+	return p.RequestId
+}
+
+func (p *ImageModerationRequest) GetImageUrl() (v string) {
+	return p.ImageUrl
+}
+
+func (p *ImageModerationRequest) GetImageData() (v []byte) {
+	return p.ImageData
+}
+
+func (p *ImageModerationRequest) GetScene() (v string) {
+	return p.Scene
+}
+func (p *ImageModerationRequest) SetRequestId(val string) {
+	p.RequestId = val
+}
+func (p *ImageModerationRequest) SetImageUrl(val string) {
+	p.ImageUrl = val
+}
+func (p *ImageModerationRequest) SetImageData(val []byte) {
+	p.ImageData = val
+}
+func (p *ImageModerationRequest) SetScene(val string) {
+	p.Scene = val
+}
+
+func (p *ImageModerationRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ImageModerationRequest(%+v)", *p)
+}
+
+var fieldIDToName_ImageModerationRequest = map[int16]string{
+	1: "request_id",
+	2: "image_url",
+	3: "image_data",
+	4: "scene",
+}
+
+type ImageModerationResponse struct {
+	RequestId   string   `thrift:"request_id,1" frugal:"1,default,string" json:"request_id"`
+	Action      string   `thrift:"action,2" frugal:"2,default,string" json:"action"`
+	RiskScore   float64  `thrift:"risk_score,3" frugal:"3,default,double" json:"risk_score"`
+	TextContent string   `thrift:"text_content,4" frugal:"4,default,string" json:"text_content"`
+	Labels      []*Label `thrift:"labels,5" frugal:"5,default,list<Label>" json:"labels"`
+	Reason      string   `thrift:"reason,6" frugal:"6,default,string" json:"reason"`
+}
+
+func NewImageModerationResponse() *ImageModerationResponse {
+	return &ImageModerationResponse{}
+}
+
+func (p *ImageModerationResponse) InitDefault() {
+}
+
+func (p *ImageModerationResponse) GetRequestId() (v string) {
+	return p.RequestId
+}
+
+func (p *ImageModerationResponse) GetAction() (v string) {
+	return p.Action
+}
+
+func (p *ImageModerationResponse) GetRiskScore() (v float64) {
+	return p.RiskScore
+}
+
+func (p *ImageModerationResponse) GetTextContent() (v string) {
+	return p.TextContent
+}
+
+func (p *ImageModerationResponse) GetLabels() (v []*Label) {
+	return p.Labels
+}
+
+func (p *ImageModerationResponse) GetReason() (v string) {
+	return p.Reason
+}
+func (p *ImageModerationResponse) SetRequestId(val string) {
+	p.RequestId = val
+}
+func (p *ImageModerationResponse) SetAction(val string) {
+	p.Action = val
+}
+func (p *ImageModerationResponse) SetRiskScore(val float64) {
+	p.RiskScore = val
+}
+func (p *ImageModerationResponse) SetTextContent(val string) {
+	p.TextContent = val
+}
+func (p *ImageModerationResponse) SetLabels(val []*Label) {
+	p.Labels = val
+}
+func (p *ImageModerationResponse) SetReason(val string) {
+	p.Reason = val
+}
+
+func (p *ImageModerationResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ImageModerationResponse(%+v)", *p)
+}
+
+var fieldIDToName_ImageModerationResponse = map[int16]string{
+	1: "request_id",
+	2: "action",
+	3: "risk_score",
+	4: "text_content",
+	5: "labels",
+	6: "reason",
+}
+
 type RuleEngineService interface {
 	Scan(ctx context.Context, req *ScanRequest) (r *ScanResponse, err error)
 }
@@ -267,5 +435,85 @@ func (p *LLMAgentServiceScanResult) String() string {
 }
 
 var fieldIDToName_LLMAgentServiceScanResult = map[int16]string{
+	0: "success",
+}
+
+type ImageModerationService interface {
+	Moderate(ctx context.Context, req *ImageModerationRequest) (r *ImageModerationResponse, err error)
+}
+
+type ImageModerationServiceModerateArgs struct {
+	Req *ImageModerationRequest `thrift:"req,1" frugal:"1,default,ImageModerationRequest" json:"req"`
+}
+
+func NewImageModerationServiceModerateArgs() *ImageModerationServiceModerateArgs {
+	return &ImageModerationServiceModerateArgs{}
+}
+
+func (p *ImageModerationServiceModerateArgs) InitDefault() {
+}
+
+var ImageModerationServiceModerateArgs_Req_DEFAULT *ImageModerationRequest
+
+func (p *ImageModerationServiceModerateArgs) GetReq() (v *ImageModerationRequest) {
+	if !p.IsSetReq() {
+		return ImageModerationServiceModerateArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ImageModerationServiceModerateArgs) SetReq(val *ImageModerationRequest) {
+	p.Req = val
+}
+
+func (p *ImageModerationServiceModerateArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ImageModerationServiceModerateArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ImageModerationServiceModerateArgs(%+v)", *p)
+}
+
+var fieldIDToName_ImageModerationServiceModerateArgs = map[int16]string{
+	1: "req",
+}
+
+type ImageModerationServiceModerateResult struct {
+	Success *ImageModerationResponse `thrift:"success,0,optional" frugal:"0,optional,ImageModerationResponse" json:"success,omitempty"`
+}
+
+func NewImageModerationServiceModerateResult() *ImageModerationServiceModerateResult {
+	return &ImageModerationServiceModerateResult{}
+}
+
+func (p *ImageModerationServiceModerateResult) InitDefault() {
+}
+
+var ImageModerationServiceModerateResult_Success_DEFAULT *ImageModerationResponse
+
+func (p *ImageModerationServiceModerateResult) GetSuccess() (v *ImageModerationResponse) {
+	if !p.IsSetSuccess() {
+		return ImageModerationServiceModerateResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ImageModerationServiceModerateResult) SetSuccess(x interface{}) {
+	p.Success = x.(*ImageModerationResponse)
+}
+
+func (p *ImageModerationServiceModerateResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ImageModerationServiceModerateResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ImageModerationServiceModerateResult(%+v)", *p)
+}
+
+var fieldIDToName_ImageModerationServiceModerateResult = map[int16]string{
 	0: "success",
 }

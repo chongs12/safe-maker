@@ -9,22 +9,29 @@ import (
 
 // Config 定义应用程序的配置结构
 type Config struct {
-	NatsURL           string   `mapstructure:"NATS_URL"`    // NATS 连接地址
-	ServerPort        string   `mapstructure:"SERVER_PORT"` // 服务监听端口
-	MySQLDSN          string   `mapstructure:"MYSQL_DSN"`   // MySQL 连接字符串
-	OllamaHost        string   `mapstructure:"OLLAMA_HOST"` // Ollama 地址 (已废弃，保留兼容)
-	ChromaURL         string   `mapstructure:"CHROMA_URL"`  // Chroma 地址 (已废弃，保留兼容)
-	GatewayPort       string   `mapstructure:"GATEWAY_PORT"`
-	RuleEnginePort    string   `mapstructure:"RULE_ENGINE_PORT"`
-	LLMAgentPort      string   `mapstructure:"LLM_AGENT_PORT"`
-	RuleEngineAddr    string   `mapstructure:"RULE_ENGINE_ADDR"`
-	LLMAgentAddr      string   `mapstructure:"LLM_AGENT_ADDR"`
-	ArkAPIKey         string   `mapstructure:"ARK_API_KEY"`
-	ArkModelID        string   `mapstructure:"ARK_MODEL_ID"`
-	ArkEmbeddingModel string   `mapstructure:"ARK_EMBEDDING_MODEL"`
-	MilvusAddr        string   `mapstructure:"MILVUS_ADDR"`
-	EtcdEndpoints     []string `mapstructure:"ETCD_ENDPOINTS"`    // Etcd 地址列表
-	UseEtcdRegistry   bool     `mapstructure:"USE_ETCD_REGISTRY"` // 是否使用 Etcd 服务注册
+	NatsURL              string   `mapstructure:"NATS_URL"`              // NATS 连接地址
+	ServerPort           string   `mapstructure:"SERVER_PORT"`           // 服务监听端口
+	MySQLDSN             string   `mapstructure:"MYSQL_DSN"`             // MySQL 连接字符串
+	OllamaHost           string   `mapstructure:"OLLAMA_HOST"`           // Ollama 地址 (已废弃，保留兼容)
+	ChromaURL            string   `mapstructure:"CHROMA_URL"`            // Chroma 地址 (已废弃，保留兼容)
+	GatewayPort          string   `mapstructure:"GATEWAY_PORT"`
+	RuleEnginePort       string   `mapstructure:"RULE_ENGINE_PORT"`
+	LLMAgentPort         string   `mapstructure:"LLM_AGENT_PORT"`
+	ImageModerationPort  string   `mapstructure:"IMAGE_MODERATION_PORT"`  // 图片审核HTTP端口
+	ImageModerationRPCPort string `mapstructure:"IMAGE_MODERATION_RPC_PORT"` // 图片审核RPC端口
+	RuleEngineAddr       string   `mapstructure:"RULE_ENGINE_ADDR"`
+	LLMAgentAddr         string   `mapstructure:"LLM_AGENT_ADDR"`
+	ImageModerationAddr  string   `mapstructure:"IMAGE_MODERATION_ADDR"`  // 图片审核服务地址
+	ArkAPIKey            string   `mapstructure:"ARK_API_KEY"`
+	ArkModelID           string   `mapstructure:"ARK_MODEL_ID"`
+	ArkEmbeddingModel    string   `mapstructure:"ARK_EMBEDDING_MODEL"`
+	MilvusAddr           string   `mapstructure:"MILVUS_ADDR"`
+	EtcdEndpoints        []string `mapstructure:"ETCD_ENDPOINTS"`         // Etcd 地址列表
+	UseEtcdRegistry      bool     `mapstructure:"USE_ETCD_REGISTRY"`      // 是否使用 Etcd 服务注册
+	JaegerEndpoint       string   `mapstructure:"JAEGER_ENDPOINT"`        // Jaeger 收集器地址
+	VolcengineAccessKey  string   `mapstructure:"VOLCENGINE_ACCESS_KEY"`  // 火山引擎AccessKey
+	VolcengineSecretKey  string   `mapstructure:"VOLCENGINE_SECRET_KEY"`  // 火山引擎SecretKey
+	VolcengineRegion     string   `mapstructure:"VOLCENGINE_REGION"`      // 火山引擎区域
 }
 
 // LoadConfig 从环境变量加载配置
@@ -46,6 +53,13 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("ARK_EMBEDDING_MODEL", "")
 	viper.SetDefault("ETCD_ENDPOINTS", []string{"localhost:2379"})
 	viper.SetDefault("USE_ETCD_REGISTRY", false)
+	viper.SetDefault("JAEGER_ENDPOINT", "http://localhost:14268/api/traces") // Jaeger 默认地址
+	viper.SetDefault("IMAGE_MODERATION_PORT", "8081")
+	viper.SetDefault("IMAGE_MODERATION_RPC_PORT", "8883")
+	viper.SetDefault("IMAGE_MODERATION_ADDR", "image-moderation:8883")
+	viper.SetDefault("VOLCENGINE_ACCESS_KEY", "")
+	viper.SetDefault("VOLCENGINE_SECRET_KEY", "")
+	viper.SetDefault("VOLCENGINE_REGION", "cn-north-1")
 
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile != "" {

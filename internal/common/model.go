@@ -85,8 +85,18 @@ type AuditTask struct {
 type PolicyVersion struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Version   string    `gorm:"type:varchar(50)" json:"version"` // 版本号 (如 v1.0.1)
-	Type      string    `gorm:"type:varchar(20)" json:"type"`    // "rule", "model"
+	Type      string    `gorm:"type:varchar(20)" json:"type"`    // "rule", "model", "prompt"
 	Config    string    `gorm:"type:text" json:"config"`         // 配置快照 (JSON)
 	Comment   string    `gorm:"type:varchar(255)" json:"comment"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// PromptPolicy Prompt 策略配置
+type PromptPolicy struct {
+	Scene        string   `json:"scene"`                 // 场景: im / ugc / ad / guardrail
+	SystemPrompt string   `json:"system_prompt"`         // 系统提示词
+	Temperature  *float64 `json:"temperature,omitempty"` // 温度参数
+	MaxTokens    *int     `json:"max_tokens,omitempty"`  // 最大 token 数
+	Tools        []string `json:"tools,omitempty"`       // 启用的工具列表
+	IsActive     bool     `json:"is_active"`             // 是否激活
 }

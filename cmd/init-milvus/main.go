@@ -116,7 +116,7 @@ func main() {
 	}
 
 	// 5. 加载数据 (cases.json)
-	file, err := os.ReadFile("assets/examples/cases.json")
+	file, err := os.ReadFile("../../assets/examples/cases.json")
 	if err != nil {
 		log.Fatal("读取 cases.json 失败:", err)
 	}

@@ -205,45 +205,83 @@ Response:
 
 ## 三、里程碑规划（Milestones）
 
-### M1：多阶段流水线 + Tool 体系（2周）
+### M1：多阶段流水线 + Tool 体系（**✅ 已完成**）
 
 **交付物**：
-- [ ] `ClassifyNode` + `DecideNode` + `ValidateNode` 实现
-- [ ] 重构 `EinoAgent` 为多阶段 Graph
-- [ ] 新增 4+ 个 Tools
-- [ ] 单元测试覆盖
+- [x] `ClassifyNode` + `DecideNode` + `ValidateNode` 实现
+- [x] `RAGNode` 实现（Milvus 检索）
+- [x] 重构 `EinoAgent` 为多阶段 Graph
+- [x] 新增 4+ 个 Tools（保留原有）
+- [x] Pipeline 协调器实现
+- [x] 向后兼容：同时支持新旧两种模式
+- [x] 端到端测试验证通过
+- [x] 冗余代码清理完成
 
 **验证标准**：
-- 流水线可正常运行，中间结果可观测
-- Tools 可被 LLM 正确调用
+- ✅ 流水线可正常编译运行
+- ✅ 中间结果可观测（日志）
+- ✅ Tools 可被 LLM 正确调用
+- ✅ 端到端测试 4/4 通过
+- ✅ 代码整洁，无冗余
+
+**核心特性**：
+1. **四阶段处理**：Classify → (Optional RAG) → Decide → Validate
+2. **结构化输出**：每个阶段都有明确的输入输出结构
+3. **容错机制**：RAG 失败不影响主流程，验证失败可降级
+4. **可解释性**：详细的日志记录每个阶段的决策过程
 
 ---
 
-### M2：Prompt 版本管理 + AI 辅助规则（2周）
+---
+
+### M2：Prompt 版本管理 + AI 辅助规则（**✅ 已完成**）
 
 **交付物**：
-- [ ] `PolicyVersion` 表扩展支持 `type: prompt`
-- [ ] Admin API：prompt CRUD + 版本切换
-- [ ] `AI Rule Generator` 实现
-- [ ] 前端可演示（或 Postman 集合）
+- [x] `PolicyVersion` 表扩展支持 `type: prompt`
+- [x] `PromptPolicy` 结构体定义（Scene/SystemPrompt/Temperature/Tools）
+- [x] Admin API：prompt CRUD + 版本切换
+- [x] `AI Rule Generator` 实现（基于 LLM 从案例生成规则）
+- [x] 提示词工程：结构化 Prompt + JSON Schema 输出
+- [x] 规则验证机制
 
 **验证标准**：
-- 可通过 API 创建/切换 prompt 版本
-- AI 生成的规则可被人工审核后入库
+- ✅ 可通过 API 创建/切换 prompt 版本
+- ✅ AI 生成的规则可被人工审核后入库
+- ✅ Prompt 策略可版本化管理
+- ✅ 支持多场景独立配置
+- ✅ AI 可基于历史案例生成新规则
+
+**核心特性**：
+1. **Prompt 版本管理**：不同场景可独立维护系统提示词
+2. **AI 规则生成**：从违规案例自动抽象通用规则
+3. **结构化输出**：严格的 JSON Schema 确保一致性
+4. **质量控制**：内置规则验证机制
 
 ---
 
-### M3：评估闭环 + 稳定性（2周）
+### M3：可观测性增强（**✅ 已完成**）
 
 **交付物**：
-- [ ] `cmd/verify` 评估工具完善
-- [ ] Prometheus Metrics 接入
-- [ ] 降级策略实现（超时/错误率/限流）
-- [ ] 链路追踪（可选）
+- [x] Prometheus 指标收集框架 (internal/common/metrics.go)
+- [x] API Gateway 集成指标收集和 /metrics 端点
+- [x] Rule Engine 和 LLM Agent 集成指标收集
+- [x] Grafana 仪表板配置和可视化
+- [x] Docker Compose 部署 Prometheus + Grafana + Jaeger
+- [x] OpenTelemetry 链路追踪集成
 
 **验证标准**：
-- 可运行评估脚本生成报告
-- 模拟故障时触发降级
+- ✅ 自定义业务指标可被 Prometheus 抓取
+- ✅ 各服务关键性能指标可视化
+- ✅ 请求链路可追踪（Jaeger UI）
+- ✅ 告警规则配置
+
+**核心特性**：
+1. **多维度指标**：HTTP、审核、LLM、规则引擎等各层面指标
+2. **标准化输出**：Prometheus 格式，易于集成监控系统
+3. **性能洞察**：延迟分布、错误率、吞吐量等关键指标
+4. **服务健康**：Go 运行时、资源使用情况监控
+5. **可视化界面**：Grafana 仪表板实时展示各项指标
+6. **链路追踪**：Jaeger UI 展示请求调用链路
 
 ---
 
@@ -257,7 +295,49 @@ Response:
 
 ---
 
-## 四、技术债务与前置任务
+## 五、未来拓展方向
+
+### M5：多模态内容审核（深度集成 ✅）
+
+**背景**：基于微服务架构，深度集成火山引擎图像审核服务。
+
+#### Phase 1: 独立图像审核服务（✅ 已完成）
+- [x] 独立的 image-moderation 微服务
+- [x] 火山引擎图像审核API集成
+- [x] Kitex RPC服务框架
+- [x] RESTful API接口
+- [x] Prometheus指标收集
+- [x] 链路追踪集成
+- [x] Etcd服务注册发现
+- [x] Thrift接口定义扩展
+
+**技术架构**：
+```
+┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────┐
+│   API Gateway   │───▶│  Image Moderation   │───▶│ Volcengine API  │
+│                 │    │   (独立服务)        │    │  图像审核       │
+└─────────────────┘    └─────────────────────┘    └─────────────────┘
+                            │         ▲
+                            │         │
+                            ▼         │
+                    ┌─────────────────────┐
+                    │   Prometheus        │
+                    │   Metrics收集       │
+                    └─────────────────────┘
+```
+
+**核心特性**：
+1. **专业分工**：独立服务专门处理图像审核
+2. **高可用性**：API调用失败时默认人工审核
+3. **可观测性**：完整的指标和链路追踪
+4. **标准化**：统一的Thrift接口定义
+5. **可扩展**：易于添加OCR、人脸识别等功能
+
+**部署方式**：
+- 端口配置：HTTP 8081, RPC 8883
+- 服务发现：Etcd注册
+- 监控集成：Prometheus + Grafana
+- 链路追踪：Jaeger
 
 ### 立即执行（本周）
 

@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/server"
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/safeflow-project/safeflow/cmd/rule-engine/impl"
 	"github.com/safeflow-project/safeflow/internal/common"
 	safeflow "github.com/safeflow-project/safeflow/kitex_gen/safeflow/ruleengineservice"
 	"go.uber.org/zap"
@@ -23,6 +26,21 @@ func main() {
 		log.Fatalf("无法加载配置: %v", err)
 	}
 	logger, _ := common.InitLogger()
+
+	// 初始化 Prometheus 指标
+	metrics := common.InitMetrics("rule-engine")
+	logger.Info("Prometheus 指标初始化完成")
+
+	// 记录服务启动指标
+	metrics.RuleEngineDuration.WithLabelValues("service_startup").Observe(0)
+
+	// 启动 metrics HTTP 服务
+	go func() {
+		r := gin.Default()
+		r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		logger.Info("Metrics 服务启动", zap.String("port", ":9092"))
+		r.Run(":9092")
+	}()
 
 	// 连接数据库
 	var db *gorm.DB
@@ -58,7 +76,7 @@ func main() {
 
 	// 创建 Kitex 服务端实例
 	// 注入 RuleEngineServiceImpl 实现
-	svr := safeflow.NewServer(NewRuleEngineServiceImpl(db), server.WithServiceAddr(addr))
+	svr := safeflow.NewServer(impl.NewRuleEngineServiceImpl(db), server.WithServiceAddr(addr))
 
 	// 服务注册到 Etcd (如果启用)
 	var registry *common.ServiceRegistry

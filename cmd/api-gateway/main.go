@@ -3,18 +3,25 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/safeflow-project/safeflow/internal/common"
+	"github.com/safeflow-project/safeflow/internal/rulegen"
 	safeflow "github.com/safeflow-project/safeflow/kitex_gen/safeflow"
 	"github.com/safeflow-project/safeflow/kitex_gen/safeflow/llmagentservice"
 	"github.com/safeflow-project/safeflow/kitex_gen/safeflow/ruleengineservice"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -34,6 +41,18 @@ func main() {
 	}
 	defer logger.Sync()
 
+	// 初始化 Prometheus 指标
+	metrics := common.InitMetrics("api-gateway")
+	logger.Info("Prometheus 指标初始化完成")
+
+	// 初始化链路追踪
+	if err := common.InitTracing("api-gateway", cfg.JaegerEndpoint); err != nil {
+		logger.Error("链路追踪初始化失败", zap.Error(err))
+	} else {
+		defer common.CloseTracing()
+		logger.Info("链路追踪初始化完成")
+	}
+
 	// 连接数据库 (用于管理 API)
 	var db *gorm.DB
 	for i := 0; i < 30; i++ {
@@ -47,6 +66,19 @@ func main() {
 	if err != nil {
 		logger.Fatal("连接 MySQL 失败", zap.Error(err))
 	}
+
+	// 自动迁移数据库表
+	logger.Info("开始数据库迁移...")
+	if err := db.AutoMigrate(
+		&common.Rule{},
+		&common.Case{},
+		&common.AuditLog{},
+		&common.AuditTask{},
+		&common.PolicyVersion{},
+	); err != nil {
+		logger.Fatal("数据库迁移失败", zap.Error(err))
+	}
+	logger.Info("数据库迁移完成")
 
 	// 3. 初始化 NATS (用于发布审核审计日志)
 	nc, _, err := common.InitNATS(cfg.NatsURL)
@@ -110,6 +142,36 @@ func main() {
 
 	// 5. 启动 Gin Web 服务器
 	r := gin.Default()
+
+	// 添加 Prometheus metrics 端点
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// 添加链路追踪中间件
+	r.Use(func(c *gin.Context) {
+		// 从请求头中提取 trace context
+		ctx := otel.GetTextMapPropagator().Extract(c.Request.Context(), propagation.HeaderCarrier(c.Request.Header))
+
+		// 创建根 span
+		ctx, span := common.StartSpan(ctx, fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path))
+		defer span.End()
+
+		// 添加请求相关信息到 span
+		span.SetAttributes(
+			semconv.HTTPMethodKey.String(c.Request.Method),
+			semconv.HTTPURLKey.String(c.Request.URL.String()),
+			semconv.HTTPUserAgentKey.String(c.Request.UserAgent()),
+		)
+
+		// 将 trace context 注入到响应头中
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(c.Writer.Header()))
+
+		// 继续处理请求
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+
+		// 设置响应状态码
+		span.SetAttributes(semconv.HTTPStatusCodeKey.Int(c.Writer.Status()))
+	})
 
 	// 配置 CORS 中间件 (允许跨域请求)
 	r.Use(func(c *gin.Context) {
@@ -298,7 +360,7 @@ func main() {
 			c.JSON(http.StatusCreated, kase)
 		})
 
-		// 审计日志中心
+		// 审核日志中心
 		admin.GET("/audits", func(c *gin.Context) {
 			var audits []common.AuditLog
 			query := db.Model(&common.AuditLog{}).Order("created_at desc")
@@ -320,6 +382,9 @@ func main() {
 			var total int64
 			query.Count(&total)
 			query.Limit(pageSize).Offset(offset).Find(&audits)
+
+			// 记录查询指标
+			metrics.HTTPRequestTotal.WithLabelValues("GET", "/admin/audits", "200").Inc()
 
 			c.JSON(http.StatusOK, gin.H{
 				"total": total,
@@ -347,6 +412,131 @@ func main() {
 				return
 			}
 			c.JSON(http.StatusCreated, version)
+		})
+
+		// Prompt 策略管理 API
+		admin.POST("/prompts", func(c *gin.Context) {
+			var req struct {
+				Scene        string   `json:"scene" binding:"required,oneof=im ugc ad guardrail"`
+				SystemPrompt string   `json:"system_prompt" binding:"required"`
+				Temperature  *float64 `json:"temperature"`
+				MaxTokens    *int     `json:"max_tokens"`
+				Tools        []string `json:"tools"`
+				Comment      string   `json:"comment"`
+			}
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			promptPolicy := common.PromptPolicy{
+				Scene:        req.Scene,
+				SystemPrompt: req.SystemPrompt,
+				Temperature:  req.Temperature,
+				MaxTokens:    req.MaxTokens,
+				Tools:        req.Tools,
+				IsActive:     true,
+			}
+
+			configBytes, _ := json.Marshal(promptPolicy)
+			version := common.PolicyVersion{
+				Version:   time.Now().Format("v20060102150405"),
+				Type:      "prompt",
+				Config:    string(configBytes),
+				Comment:   req.Comment,
+				CreatedAt: time.Now(),
+			}
+
+			if err := db.Create(&version).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusCreated, version)
+		})
+
+		admin.GET("/prompts/:scene", func(c *gin.Context) {
+			scene := c.Param("scene")
+			var versions []common.PolicyVersion
+			db.Where("type = ? AND config LIKE ?", "prompt", "%\"scene\":\""+scene+"\"%").
+				Order("created_at DESC").Find(&versions)
+			c.JSON(http.StatusOK, versions)
+		})
+
+		admin.PUT("/prompts/:id/activate", func(c *gin.Context) {
+			id := c.Param("id")
+			// 先取消同场景下的其他版本
+			var version common.PolicyVersion
+			if err := db.First(&version, id).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Version not found"})
+				return
+			}
+
+			// 解析配置获取场景
+			var policy common.PromptPolicy
+			json.Unmarshal([]byte(version.Config), &policy)
+
+			// 取消同场景其他版本
+			db.Model(&common.PolicyVersion{}).
+				Where("type = ? AND config LIKE ? AND id != ?", "prompt", "%\"scene\":\""+policy.Scene+"\"%", id).
+				Update("config", gorm.Expr("REPLACE(config, '\"is_active\":true', '\"is_active\":false')"))
+
+			// 激活当前版本
+			updatedConfig := strings.Replace(version.Config, `"is_active":false`, `"is_active":true`, 1)
+			db.Model(&version).Update("config", updatedConfig)
+
+			c.JSON(http.StatusOK, gin.H{"message": "Activated"})
+		})
+
+		// AI 辅助规则生成 API
+		admin.POST("/rules/generate", func(c *gin.Context) {
+			var req struct {
+				Category string `json:"category" binding:"required"` // 可选: 指定类别生成规则
+			}
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			// 查询相关违规案例
+			var cases []common.Case
+			query := db.Where("label = ?", "unsafe")
+			if req.Category != "" {
+				query = query.Where("category = ?", req.Category)
+			}
+			query.Order("created_at DESC").Limit(10).Find(&cases) // 最多取10个案例
+
+			if len(cases) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "没有找到相关违规案例"})
+				return
+			}
+
+			// 初始化 RuleGenerator
+			ruleGen, err := rulegen.NewRuleGenerator(context.Background(), cfg, logger)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "初始化规则生成器失败: " + err.Error()})
+				return
+			}
+
+			// 生成规则
+			rules, err := ruleGen.GenerateRules(context.Background(), cases)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "生成规则失败: " + err.Error()})
+				return
+			}
+
+			// 验证规则
+			validRules := make([]rulegen.RuleTemplate, 0, len(rules))
+			for _, rule := range rules {
+				if ok, _ := ruleGen.ValidateRule(context.Background(), rule); ok {
+					validRules = append(validRules, rule)
+				}
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"generated_count": len(rules),
+				"valid_count":     len(validRules),
+				"rules":           validRules,
+			})
 		})
 	}
 

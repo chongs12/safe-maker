@@ -1,0 +1,185 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "SafeFlow 监控面板",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "5s",
+    "panels": [
+      {
+        "id": 1,
+        "type": "graph",
+        "title": "审核请求速率",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(audit_requests_total[1m])",
+            "legendFormat": "{{source}} - {{scene}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps",
+            "label": "请求/秒"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "type": "graph",
+        "title": "审核动作分布",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(audit_actions_total[1m])",
+            "legendFormat": "{{action}} ({{source}})"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "type": "graph",
+        "title": "平均审核延迟",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(audit_duration_seconds_sum[1m]) / rate(audit_duration_seconds_count[1m])",
+            "legendFormat": "{{source}} - {{scene}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "秒"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "type": "graph",
+        "title": "LLM 调用统计",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(llm_calls_total[1m])",
+            "legendFormat": "{{model}} - {{node}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "type": "graph",
+        "title": "规则匹配统计",
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(rule_matches_total[1m])",
+            "legendFormat": "{{category}} - {{action}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "type": "stat",
+        "title": "当前 Goroutines",
+        "gridPos": {
+          "x": 12,
+          "y": 16,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "go_goroutines",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["last"]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "type": "stat",
+        "title": "内存使用",
+        "gridPos": {
+          "x": 18,
+          "y": 16,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "go_memstats_alloc_bytes / 1024 / 1024",
+            "legendFormat": "{{service}} MB"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": ["last"]
+          }
+        }
+      }
+    ]
+  },
+  "folderId": 0,
+  "overwrite": true
+}

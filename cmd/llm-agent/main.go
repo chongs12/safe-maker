@@ -9,7 +9,10 @@ import (
 	"syscall"
 
 	"github.com/cloudwego/kitex/server"
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/safeflow-project/safeflow/internal/common"
+	"github.com/safeflow-project/safeflow/internal/llmagent"
 	safeflow "github.com/safeflow-project/safeflow/kitex_gen/safeflow/llmagentservice"
 	"go.uber.org/zap"
 )
@@ -22,8 +25,23 @@ func main() {
 	logger, _ := common.InitLogger()
 	addr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+cfg.LLMAgentPort)
 
+	// 初始化 Prometheus 指标
+	metrics := common.InitMetrics("llm-agent")
+	logger.Info("Prometheus 指标初始化完成")
+
+	// 记录服务启动指标
+	metrics.LLMCallsTotal.WithLabelValues("service", "startup").Inc()
+
+	// 启动 metrics HTTP 服务
+	go func() {
+		r := gin.Default()
+		r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		logger.Info("Metrics 服务启动", zap.String("port", ":9093"))
+		r.Run(":9093")
+	}()
+
 	// 初始化服务实现 (包含 Eino Agent 的初始化)
-	impl := NewLLMAgentServiceImpl(context.Background(), cfg)
+	impl := llmagent.NewLLMAgentServiceImpl(context.Background(), cfg)
 
 	// 创建 Kitex 服务端
 	svr := safeflow.NewServer(impl, server.WithServiceAddr(addr))

@@ -35,7 +35,7 @@ type CheckPoliticalArgs struct {
 }
 
 // NewEinoAgent 初始化并构建 Eino Agent
-func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
+func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, *ark_model.ChatModel, *milvus2.Retriever, error) {
 	// 1. 初始化 Embedding (用于 Retriever)
 	// 使用火山引擎 Ark Embedding 服务
 	emb, err := ark_embed.NewEmbedder(ctx, &ark_embed.EmbeddingConfig{
@@ -48,9 +48,9 @@ func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
 
 	// 2. 初始化 Milvus Retriever (向量检索)
 	// 用于从向量数据库中检索相似的历史违规案例
-	var retriever *milvus2.Retriever
+	var retrieverObj *milvus2.Retriever
 	if emb != nil {
-		retriever, err = milvus2.NewRetriever(ctx, &milvus2.RetrieverConfig{
+		retrieverObj, err = milvus2.NewRetriever(ctx, &milvus2.RetrieverConfig{
 			ClientConfig: &milvusclient.ClientConfig{
 				Address: cfg.MilvusAddr,
 			},
@@ -79,10 +79,10 @@ func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
 		}),
 	}
 	searchTool := utils.NewTool(searchInfo, func(ctx context.Context, args *SearchArgs) (string, error) {
-		if retriever == nil {
+		if retrieverObj == nil {
 			return "错误: Retriever 未初始化", nil
 		}
-		docs, err := retriever.Retrieve(ctx, args.Keyword)
+		docs, err := retrieverObj.Retrieve(ctx, args.Keyword)
 		if err != nil {
 			return "错误: " + err.Error(), nil
 		}
@@ -119,7 +119,7 @@ func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
 		Model:  cfg.ArkModelID,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	// 绑定工具到模型
@@ -133,7 +133,7 @@ func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
 	// 绑定工具信息 (Model Bind Tools)
 	err = chatModel.BindTools(toolInfos)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	toolModel := chatModel
 
@@ -145,7 +145,7 @@ func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
 		Tools: tools,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	// 创建图
@@ -174,10 +174,10 @@ func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, error) {
 	// 编译图
 	runnable, err := g.Compile(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
-	return &EinoAgent{runnable: runnable}, nil
+	return &EinoAgent{runnable: runnable}, chatModel, retrieverObj, nil
 }
 
 // Run 执行 Agent 逻辑
