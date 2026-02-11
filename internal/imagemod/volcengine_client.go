@@ -38,10 +38,10 @@ func NewVolcengineImageModerationClient(cfg *common.Config, logger *zap.Logger) 
 
 // ModerationRequest 图像审核请求
 type ModerationRequest struct {
-	Service string `json:"Service"`
-	Version string `json:"Version"`
-	Action  string `json:"Action"`
-	Region  string `json:"Region"`
+	Service  string `json:"Service"`
+	Version  string `json:"Version"`
+	Action   string `json:"Action"`
+	Region   string `json:"Region"`
 	ImageURL string `json:"ImageURL"`
 }
 
@@ -87,10 +87,10 @@ func (c *VolcengineImageModerationClient) Moderate(ctx context.Context, imageURL
 		return nil, fmt.Errorf("火山引擎密钥未配置")
 	}
 
-	// 构造请求参数
+	// 构造请求参数 - 使用最新的API规范
 	params := map[string]string{
 		"Service":  "imageaudit",
-		"Version":  "2021-06-01",
+		"Version":  "2023-10-01", // 更新到较新版本
 		"Action":   "ImageContentRisk",
 		"Region":   c.region,
 		"ImageURL": imageURL,
@@ -127,7 +127,7 @@ func (c *VolcengineImageModerationClient) signRequest(params map[string]string) 
 
 	var canonicalQueryString []string
 	for _, k := range keys {
-		canonicalQueryString = append(canonicalQueryString, 
+		canonicalQueryString = append(canonicalQueryString,
 			fmt.Sprintf("%s=%s", url.QueryEscape(k), url.QueryEscape(params[k])))
 	}
 	canonicalString := strings.Join(canonicalQueryString, "&")
@@ -145,6 +145,12 @@ func (c *VolcengineImageModerationClient) signRequest(params map[string]string) 
 
 // sendRequest 发送HTTP请求
 func (c *VolcengineImageModerationClient) sendRequest(ctx context.Context, params map[string]string) (*ModerationResult, error) {
+	// 构造API请求 - 使用最新的端点和参数
+	host := "open.volcengineapi.com" // 正确的火山引擎API端点
+	action := "ImageContentRisk"
+	version := "2023-10-01" // 保持版本一致
+	service := "imageaudit"
+
 	// 构造查询参数
 	var queryParams []string
 	for k, v := range params {
@@ -152,8 +158,40 @@ func (c *VolcengineImageModerationClient) sendRequest(ctx context.Context, param
 	}
 	queryString := strings.Join(queryParams, "&")
 
-	// 构造请求URL
-	apiURL := fmt.Sprintf("https://imageaudit.volcengineapi.com/?%s", queryString)
+	// 构造规范请求
+	canonicalURI := "/"
+	canonicalQueryString := queryString
+	canonicalHeaders := "content-type:application/json\nhost:" + host + "\nx-content-sha256-trailers:\n"
+	signedHeaders := "content-type;host;x-content-sha256-trailers"
+
+	// 计算payload hash
+	payloadHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // 空body的hash
+
+	canonicalRequest := fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s",
+		"GET", canonicalURI, canonicalQueryString, canonicalHeaders, signedHeaders, payloadHash)
+
+	// 构造待签名字符串
+	algorithm := "TC3-HMAC-SHA256"
+	timestamp := time.Now().Unix()
+	date := time.Unix(timestamp, 0).UTC().Format("2006-01-02")
+	credentialScope := fmt.Sprintf("%s/%s/tc3_request", date, service)
+
+	hash := sha256.Sum256([]byte(canonicalRequest))
+	stringToSign := fmt.Sprintf("%s\n%d\n%s\n%s",
+		algorithm, timestamp, credentialScope, hex.EncodeToString(hash[:]))
+
+	// 计算签名
+	secretDate := hmacSHA256(date, []byte("TC3"+c.secretKey))
+	secretService := hmacSHA256(service, secretDate)
+	secretSigning := hmacSHA256("tc3_request", secretService)
+	signature := hex.EncodeToString(hmacSHA256(stringToSign, secretSigning))
+
+	// 构造Authorization头
+	authorization := fmt.Sprintf("%s Credential=%s/%s, SignedHeaders=%s, Signature=%s",
+		algorithm, c.accessKey, credentialScope, signedHeaders, signature)
+
+	// 构造完整URL
+	apiURL := fmt.Sprintf("https://%s%s?%s", host, canonicalURI, queryString)
 
 	// 创建HTTP请求
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
@@ -163,8 +201,12 @@ func (c *VolcengineImageModerationClient) sendRequest(ctx context.Context, param
 
 	// 设置请求头
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("TC3-HMAC-SHA256 Credential=%s/%s/imageaudit/request", 
-		c.accessKey, time.Now().UTC().Format("20060102")))
+	req.Header.Set("Host", host)
+	req.Header.Set("Authorization", authorization)
+	req.Header.Set("X-TC-Timestamp", fmt.Sprintf("%d", timestamp))
+	req.Header.Set("X-TC-Version", version)
+	req.Header.Set("X-TC-Action", action)
+	req.Header.Set("X-TC-Region", c.region)
 
 	// 发送请求
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -194,6 +236,13 @@ func (c *VolcengineImageModerationClient) sendRequest(ctx context.Context, param
 	return &result, nil
 }
 
+// hmacSHA256 HMAC-SHA256计算
+func hmacSHA256(message string, key []byte) []byte {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(message))
+	return h.Sum(nil)
+}
+
 // ConvertToInternalResult 转换为内部结果格式
 func (c *VolcengineImageModerationClient) ConvertToInternalResult(volcResult *ModerationResult) *ImageModerationResult {
 	internal := &ImageModerationResult{
@@ -207,7 +256,7 @@ func (c *VolcengineImageModerationClient) ConvertToInternalResult(volcResult *Mo
 			Name:       volcResult.Data.Antispam.Label,
 			Confidence: volcResult.Data.Antispam.Rate,
 		}
-		
+
 		// 设置审核动作
 		switch volcResult.Data.Antispam.Suggestion {
 		case "pass":
@@ -219,7 +268,7 @@ func (c *VolcengineImageModerationClient) ConvertToInternalResult(volcResult *Mo
 		default:
 			internal.Action = "review"
 		}
-		
+
 		internal.Labels = append(internal.Labels, label)
 		internal.RiskScore = volcResult.Data.Antispam.Rate
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+
 	safeflow "github.com/safeflow-project/safeflow/kitex_gen/safeflow"
 )
 

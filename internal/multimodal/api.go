@@ -40,8 +40,8 @@ func (api *ImageModerationAPI) RegisterRoutes(r *gin.Engine) {
 
 // handleImageModeration 处理图片审核请求
 func (api *ImageModerationAPI) handleImageModeration(c *gin.Context) {
-	start := common.GetTracer().Start(c.Request.Context(), "image.moderation")
-	defer start.End()
+	ctx, span := common.GetTracer().Start(c.Request.Context(), "image.moderation")
+	defer span.End()
 
 	var req struct {
 		ImageURL string `json:"image_url"`
@@ -67,7 +67,7 @@ func (api *ImageModerationAPI) handleImageModeration(c *gin.Context) {
 	}
 
 	// 执行审核
-	result, err := api.moderator.Moderate(c.Request.Context(), modReq)
+	result, err := api.moderator.Moderate(ctx, modReq)
 	if err != nil {
 		api.logger.Error("图片审核失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "审核服务暂时不可用"})

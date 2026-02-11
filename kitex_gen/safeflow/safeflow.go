@@ -110,6 +110,62 @@ var fieldIDToName_ScanResponse = map[int16]string{
 	4: "source",
 }
 
+type Box struct {
+	X1 int32 `thrift:"x1,1" frugal:"1,default,i32" json:"x1"`
+	Y1 int32 `thrift:"y1,2" frugal:"2,default,i32" json:"y1"`
+	X2 int32 `thrift:"x2,3" frugal:"3,default,i32" json:"x2"`
+	Y2 int32 `thrift:"y2,4" frugal:"4,default,i32" json:"y2"`
+}
+
+func NewBox() *Box {
+	return &Box{}
+}
+
+func (p *Box) InitDefault() {
+}
+
+func (p *Box) GetX1() (v int32) {
+	return p.X1
+}
+
+func (p *Box) GetY1() (v int32) {
+	return p.Y1
+}
+
+func (p *Box) GetX2() (v int32) {
+	return p.X2
+}
+
+func (p *Box) GetY2() (v int32) {
+	return p.Y2
+}
+func (p *Box) SetX1(val int32) {
+	p.X1 = val
+}
+func (p *Box) SetY1(val int32) {
+	p.Y1 = val
+}
+func (p *Box) SetX2(val int32) {
+	p.X2 = val
+}
+func (p *Box) SetY2(val int32) {
+	p.Y2 = val
+}
+
+func (p *Box) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Box(%+v)", *p)
+}
+
+var fieldIDToName_Box = map[int16]string{
+	1: "x1",
+	2: "y1",
+	3: "x2",
+	4: "y2",
+}
+
 type Label struct {
 	Name       string  `thrift:"name,1" frugal:"1,default,string" json:"name"`
 	Confidence float64 `thrift:"confidence,2" frugal:"2,default,double" json:"confidence"`
@@ -153,6 +209,7 @@ type ImageModerationRequest struct {
 	ImageUrl  string `thrift:"image_url,2" frugal:"2,default,string" json:"image_url"`
 	ImageData []byte `thrift:"image_data,3" frugal:"3,default,binary" json:"image_data"`
 	Scene     string `thrift:"scene,4" frugal:"4,default,string" json:"scene"`
+	EnableOcr bool   `thrift:"enable_ocr,5" frugal:"5,default,bool" json:"enable_ocr"`
 }
 
 func NewImageModerationRequest() *ImageModerationRequest {
@@ -177,6 +234,10 @@ func (p *ImageModerationRequest) GetImageData() (v []byte) {
 func (p *ImageModerationRequest) GetScene() (v string) {
 	return p.Scene
 }
+
+func (p *ImageModerationRequest) GetEnableOcr() (v bool) {
+	return p.EnableOcr
+}
 func (p *ImageModerationRequest) SetRequestId(val string) {
 	p.RequestId = val
 }
@@ -188,6 +249,9 @@ func (p *ImageModerationRequest) SetImageData(val []byte) {
 }
 func (p *ImageModerationRequest) SetScene(val string) {
 	p.Scene = val
+}
+func (p *ImageModerationRequest) SetEnableOcr(val bool) {
+	p.EnableOcr = val
 }
 
 func (p *ImageModerationRequest) String() string {
@@ -202,15 +266,17 @@ var fieldIDToName_ImageModerationRequest = map[int16]string{
 	2: "image_url",
 	3: "image_data",
 	4: "scene",
+	5: "enable_ocr",
 }
 
 type ImageModerationResponse struct {
-	RequestId   string   `thrift:"request_id,1" frugal:"1,default,string" json:"request_id"`
-	Action      string   `thrift:"action,2" frugal:"2,default,string" json:"action"`
-	RiskScore   float64  `thrift:"risk_score,3" frugal:"3,default,double" json:"risk_score"`
-	TextContent string   `thrift:"text_content,4" frugal:"4,default,string" json:"text_content"`
-	Labels      []*Label `thrift:"labels,5" frugal:"5,default,list<Label>" json:"labels"`
-	Reason      string   `thrift:"reason,6" frugal:"6,default,string" json:"reason"`
+	RequestId   string      `thrift:"request_id,1" frugal:"1,default,string" json:"request_id"`
+	Action      string      `thrift:"action,2" frugal:"2,default,string" json:"action"`
+	RiskScore   float64     `thrift:"risk_score,3" frugal:"3,default,double" json:"risk_score"`
+	TextContent string      `thrift:"text_content,4" frugal:"4,default,string" json:"text_content"`
+	Labels      []*Label    `thrift:"labels,5" frugal:"5,default,list<Label>" json:"labels"`
+	Reason      string      `thrift:"reason,6" frugal:"6,default,string" json:"reason"`
+	OcrResult_  *OCRResult_ `thrift:"ocr_result,7" frugal:"7,default,OCRResult_" json:"ocr_result"`
 }
 
 func NewImageModerationResponse() *ImageModerationResponse {
@@ -243,6 +309,15 @@ func (p *ImageModerationResponse) GetLabels() (v []*Label) {
 func (p *ImageModerationResponse) GetReason() (v string) {
 	return p.Reason
 }
+
+var ImageModerationResponse_OcrResult__DEFAULT *OCRResult_
+
+func (p *ImageModerationResponse) GetOcrResult_() (v *OCRResult_) {
+	if !p.IsSetOcrResult_() {
+		return ImageModerationResponse_OcrResult__DEFAULT
+	}
+	return p.OcrResult_
+}
 func (p *ImageModerationResponse) SetRequestId(val string) {
 	p.RequestId = val
 }
@@ -261,6 +336,13 @@ func (p *ImageModerationResponse) SetLabels(val []*Label) {
 func (p *ImageModerationResponse) SetReason(val string) {
 	p.Reason = val
 }
+func (p *ImageModerationResponse) SetOcrResult_(val *OCRResult_) {
+	p.OcrResult_ = val
+}
+
+func (p *ImageModerationResponse) IsSetOcrResult_() bool {
+	return p.OcrResult_ != nil
+}
 
 func (p *ImageModerationResponse) String() string {
 	if p == nil {
@@ -276,6 +358,119 @@ var fieldIDToName_ImageModerationResponse = map[int16]string{
 	4: "text_content",
 	5: "labels",
 	6: "reason",
+	7: "ocr_result",
+}
+
+type OCRResult_ struct {
+	ExtractedText string       `thrift:"extracted_text,1" frugal:"1,default,string" json:"extracted_text"`
+	Confidence    float64      `thrift:"confidence,2" frugal:"2,default,double" json:"confidence"`
+	TextBlocks    []*TextBlock `thrift:"text_blocks,3" frugal:"3,default,list<TextBlock>" json:"text_blocks"`
+	Language      string       `thrift:"language,4" frugal:"4,default,string" json:"language"`
+}
+
+func NewOCRResult_() *OCRResult_ {
+	return &OCRResult_{}
+}
+
+func (p *OCRResult_) InitDefault() {
+}
+
+func (p *OCRResult_) GetExtractedText() (v string) {
+	return p.ExtractedText
+}
+
+func (p *OCRResult_) GetConfidence() (v float64) {
+	return p.Confidence
+}
+
+func (p *OCRResult_) GetTextBlocks() (v []*TextBlock) {
+	return p.TextBlocks
+}
+
+func (p *OCRResult_) GetLanguage() (v string) {
+	return p.Language
+}
+func (p *OCRResult_) SetExtractedText(val string) {
+	p.ExtractedText = val
+}
+func (p *OCRResult_) SetConfidence(val float64) {
+	p.Confidence = val
+}
+func (p *OCRResult_) SetTextBlocks(val []*TextBlock) {
+	p.TextBlocks = val
+}
+func (p *OCRResult_) SetLanguage(val string) {
+	p.Language = val
+}
+
+func (p *OCRResult_) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("OCRResult_(%+v)", *p)
+}
+
+var fieldIDToName_OCRResult_ = map[int16]string{
+	1: "extracted_text",
+	2: "confidence",
+	3: "text_blocks",
+	4: "language",
+}
+
+type TextBlock struct {
+	Text        string  `thrift:"text,1" frugal:"1,default,string" json:"text"`
+	Confidence  float64 `thrift:"confidence,2" frugal:"2,default,double" json:"confidence"`
+	BoundingBox *Box    `thrift:"bounding_box,3" frugal:"3,default,Box" json:"bounding_box"`
+}
+
+func NewTextBlock() *TextBlock {
+	return &TextBlock{}
+}
+
+func (p *TextBlock) InitDefault() {
+}
+
+func (p *TextBlock) GetText() (v string) {
+	return p.Text
+}
+
+func (p *TextBlock) GetConfidence() (v float64) {
+	return p.Confidence
+}
+
+var TextBlock_BoundingBox_DEFAULT *Box
+
+func (p *TextBlock) GetBoundingBox() (v *Box) {
+	if !p.IsSetBoundingBox() {
+		return TextBlock_BoundingBox_DEFAULT
+	}
+	return p.BoundingBox
+}
+func (p *TextBlock) SetText(val string) {
+	p.Text = val
+}
+func (p *TextBlock) SetConfidence(val float64) {
+	p.Confidence = val
+}
+func (p *TextBlock) SetBoundingBox(val *Box) {
+	p.BoundingBox = val
+}
+
+func (p *TextBlock) IsSetBoundingBox() bool {
+	return p.BoundingBox != nil
+}
+
+func (p *TextBlock) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("TextBlock(%+v)", *p)
+}
+
+var fieldIDToName_TextBlock = map[int16]string{
+	1: "text",
+	2: "confidence",
+	3: "bounding_box",
 }
 
 type RuleEngineService interface {

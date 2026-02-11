@@ -2,7 +2,6 @@ package multimodal
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -130,7 +129,7 @@ func (im *ImageModerator) getImageData(req *ImageModerationRequest) ([]byte, err
 func (im *ImageModerator) extractText(imageData []byte) (string, error) {
 	// TODO: 集成OCR服务
 	// 示例：调用百度OCR或PaddleOCR
-	base64Img := base64.StdEncoding.EncodeToString(imageData)
+	// base64Img := base64.StdEncoding.EncodeToString(imageData)
 
 	// 模拟OCR结果
 	im.logger.Debug("模拟OCR提取", zap.String("image_size", fmt.Sprintf("%d bytes", len(imageData))))

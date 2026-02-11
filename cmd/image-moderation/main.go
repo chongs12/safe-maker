@@ -24,6 +24,11 @@ func main() {
 		log.Fatalf("无法加载配置: %v", err)
 	}
 
+	// 调试输出配置信息
+	log.Printf("DEBUG: VOLCENGINE_ACCESS_KEY = %s", cfg.VolcengineAccessKey)
+	log.Printf("DEBUG: VOLCENGINE_SECRET_KEY = %s", cfg.VolcengineSecretKey)
+	log.Printf("DEBUG: VOLCENGINE_REGION = %s", cfg.VolcengineRegion)
+
 	// 2. 初始化日志
 	logger, _ := common.InitLogger()
 	defer logger.Sync()
@@ -46,13 +51,13 @@ func main() {
 	// 6. 启动 REST API 服务
 	go func() {
 		r := gin.Default()
-		
+
 		// 添加 Prometheus metrics 端点
 		r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-		
+
 		// 注册图片审核API路由
 		imageModService.RegisterRoutes(r)
-		
+
 		// 启动HTTP服务
 		addr := ":" + cfg.ImageModerationPort
 		logger.Info("图片审核API服务启动", zap.String("addr", addr))
