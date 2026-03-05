@@ -145,6 +145,9 @@ func main() {
 
 	// 添加 Prometheus metrics 端点
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "api-gateway"})
+	})
 
 	// 添加链路追踪中间件
 	r.Use(func(c *gin.Context) {

@@ -24,14 +24,14 @@ func main() {
 		log.Fatalf("无法加载配置: %v", err)
 	}
 
-	// 调试输出配置信息
-	log.Printf("DEBUG: VOLCENGINE_ACCESS_KEY = %s", cfg.VolcengineAccessKey)
-	log.Printf("DEBUG: VOLCENGINE_SECRET_KEY = %s", cfg.VolcengineSecretKey)
-	log.Printf("DEBUG: VOLCENGINE_REGION = %s", cfg.VolcengineRegion)
-
 	// 2. 初始化日志
 	logger, _ := common.InitLogger()
 	defer logger.Sync()
+	logger.Info("图片审核配置加载完成",
+		zap.Bool("volcengine_access_key_configured", cfg.VolcengineAccessKey != ""),
+		zap.Bool("volcengine_secret_key_configured", cfg.VolcengineSecretKey != ""),
+		zap.String("volcengine_region", cfg.VolcengineRegion),
+	)
 
 	// 3. 初始化 Prometheus 指标
 	_ = common.InitMetrics("image-moderation")

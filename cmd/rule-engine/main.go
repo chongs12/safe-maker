@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -38,6 +39,9 @@ func main() {
 	go func() {
 		r := gin.Default()
 		r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		r.GET("/health", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "rule-engine"})
+		})
 		logger.Info("Metrics 服务启动", zap.String("port", ":9092"))
 		r.Run(":9092")
 	}()

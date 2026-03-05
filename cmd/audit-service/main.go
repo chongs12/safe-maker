@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -26,6 +28,23 @@ func main() {
 	// 加载配置和日志
 	cfg, _ := common.LoadConfig()
 	logger, _ := common.InitLogger()
+
+	healthPort := os.Getenv("AUDIT_HEALTH_PORT")
+	if healthPort == "" {
+		healthPort = "9094"
+	}
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","service":"audit-service"}`))
+		})
+		addr := ":" + healthPort
+		logger.Info("审计服务健康检查端口启动", zap.String("addr", addr))
+		if err := http.ListenAndServe(addr, mux); err != nil {
+			logger.Fatal("审计服务健康检查启动失败", zap.Error(err))
+		}
+	}()
 
 	// 1. 连接 MySQL 数据库
 	// 使用重试机制，因为 MySQL 容器可能启动较慢

@@ -66,6 +66,11 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - safeflow-net
 
@@ -129,9 +134,19 @@ services:
       - GATEWAY_PORT=${GATEWAY_PORT:-8080}
       - RULE_ENGINE_ADDR=rule-engine:${RULE_ENGINE_PORT:-8881}
       - LLM_AGENT_ADDR=llm-agent:${LLM_AGENT_PORT:-8882}
+      - IMAGE_MODERATION_ADDR=image-moderation:${IMAGE_MODERATION_RPC_PORT:-8883}
+      - MYSQL_DSN=root:root@tcp(mysql:3306)/safeflow?charset=utf8mb4&parseTime=True&loc=Local
     depends_on:
       - rule-engine
       - llm-agent
+      - image-moderation
+      - mysql
+      - nats
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${GATEWAY_PORT:-8080}/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     networks:
       - safeflow-net
 
@@ -144,6 +159,14 @@ services:
       - "${RULE_ENGINE_PORT:-8881}:${RULE_ENGINE_PORT:-8881}"
     environment:
       - RULE_ENGINE_PORT=${RULE_ENGINE_PORT:-8881}
+      - MYSQL_DSN=root:root@tcp(mysql:3306)/safeflow?charset=utf8mb4&parseTime=True&loc=Local
+    depends_on:
+      - mysql
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9092/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     networks:
       - safeflow-net
 
@@ -160,8 +183,60 @@ services:
       - ARK_EMBEDDING_MODEL=${ARK_EMBEDDING_MODEL}
       - MILVUS_ADDR=milvus:19530
       - LLM_AGENT_PORT=${LLM_AGENT_PORT:-8882}
+      - VOLCENGINE_ACCESS_KEY=${VOLCENGINE_ACCESS_KEY}
+      - VOLCENGINE_SECRET_KEY=${VOLCENGINE_SECRET_KEY}
+      - VOLCENGINE_REGION=${VOLCENGINE_REGION:-cn-north-1}
     depends_on:
       - milvus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - safeflow-net
+
+  image-moderation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: image-moderation
+    ports:
+      - "${IMAGE_MODERATION_PORT:-8081}:${IMAGE_MODERATION_PORT:-8081}"
+      - "${IMAGE_MODERATION_RPC_PORT:-8883}:${IMAGE_MODERATION_RPC_PORT:-8883}"
+    environment:
+      - IMAGE_MODERATION_PORT=${IMAGE_MODERATION_PORT:-8081}
+      - IMAGE_MODERATION_RPC_PORT=${IMAGE_MODERATION_RPC_PORT:-8883}
+      - VOLCENGINE_ACCESS_KEY=${VOLCENGINE_ACCESS_KEY}
+      - VOLCENGINE_SECRET_KEY=${VOLCENGINE_SECRET_KEY}
+      - VOLCENGINE_REGION=${VOLCENGINE_REGION:-cn-north-1}
+      - ETCD_ENDPOINTS=${ETCD_ENDPOINTS}
+      - USE_ETCD_REGISTRY=${USE_ETCD_REGISTRY:-false}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${IMAGE_MODERATION_PORT:-8081}/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - safeflow-net
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: audit-service
+    environment:
+      - NATS_URL=${NATS_URL}
+      - MYSQL_DSN=root:root@tcp(mysql:3306)/safeflow?charset=utf8mb4&parseTime=True&loc=Local
+      - AUDIT_HEALTH_PORT=9094
+    depends_on:
+      - nats
+      - mysql
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9094/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     networks:
       - safeflow-net
 

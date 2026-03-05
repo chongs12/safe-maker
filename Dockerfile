@@ -20,6 +20,9 @@ RUN go build -o /bin/llm-agent ./cmd/llm-agent
 # Build Audit Service
 RUN go build -o /bin/audit-service ./cmd/audit-service
 
+# Build Image Moderation Service
+RUN go build -o /bin/image-moderation ./cmd/image-moderation
+
 # Final stages
 FROM alpine:latest AS api-gateway
 WORKDIR /app
@@ -40,3 +43,8 @@ FROM alpine:latest AS audit-service
 WORKDIR /app
 COPY --from=builder /bin/audit-service .
 CMD ["./audit-service"]
+
+FROM alpine:latest AS image-moderation
+WORKDIR /app
+COPY --from=builder /bin/image-moderation .
+CMD ["./image-moderation"]
