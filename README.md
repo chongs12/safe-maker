@@ -37,6 +37,24 @@ graph TD
 - **网关**: Gin Web Framework。
 - **基础设施**: Docker Compose (Etcd, Minio, Milvus, NATS, MySQL).
 
+## ✅ 项目进度（对齐 v2 计划）
+
+- **阶段 S1**：完成内容流入、自动审核与结果分流
+- **阶段 S2**：完成人工复审队列、裁决回传与案例沉淀
+- **阶段 S3**：已具备规则回测与 Prompt 版本化，评估与质检指标待完善
+
+## ✨ 已实现功能
+
+- 审核主干：规则引擎优先 + LLM 审核兜底
+- 结果分流：通过 / 拦截 / 人工复审
+- 人工复审队列：领取、裁决、结果回传
+- 审核结果查询：按 request_id 拉取结果与复审任务
+- 审计日志中心：按用户/动作/来源检索
+- 规则治理：增删改查、启停、快照
+- Prompt 策略管理：版本化与激活
+- 规则回测：基于历史案例评估规则效果
+- 模拟流量源：持续投喂内容流
+
 ## 🚀 快速开始
 
 ### 前置要求
@@ -83,12 +101,39 @@ graph TD
      go run .
      ```
 
+   - **Audit Service**:
+     ```bash
+     cd cmd/audit-service
+     go run .
+     ```
+
+   - **Image Moderation**:
+     ```bash
+     cd cmd/image-moderation
+     go run .
+     ```
+
 4. **测试请求**:
    ```bash
    curl -X POST http://localhost:8080/submit \
      -H "Content-Type: application/json" \
      -d '{"content": "This is a test message regarding gambling.", "user_id": "test_user"}'
    ```
+
+## 🧪 如何测试
+
+```bash
+go test ./...
+```
+
+## 🧭 常用管理 API
+
+- 复审队列：`GET /admin/reviews`
+- 复审领取：`POST /admin/reviews/:id/claim`
+- 复审裁决：`POST /admin/reviews/:id/decide`
+- 结果查询：`GET /moderation/:request_id`
+- 规则回测：`POST /admin/rules/backtest`
+- 模拟流量：`POST /admin/simulator/start` / `POST /admin/simulator/stop` / `GET /admin/simulator/status`
 
 ## 🧩 Eino Agent 实现
 

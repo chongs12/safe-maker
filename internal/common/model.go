@@ -81,6 +81,41 @@ type AuditTask struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type ReviewTask struct {
+	ID             string     `gorm:"primaryKey" json:"id"`
+	RequestID      string     `gorm:"index" json:"request_id"`
+	UserID         string     `gorm:"index" json:"user_id"`
+	Content        string     `gorm:"type:text" json:"content"`
+	Status         string     `gorm:"type:varchar(20);index" json:"status"`
+	Source         string     `gorm:"type:varchar(30)" json:"source"`
+	Reason         string     `gorm:"type:text" json:"reason"`
+	Reviewer       string     `gorm:"type:varchar(64)" json:"reviewer"`
+	FinalAction    string     `gorm:"type:varchar(20)" json:"final_action"`
+	DecisionReason string     `gorm:"type:text" json:"decision_reason"`
+	ClaimedAt      *time.Time `json:"claimed_at"`
+	ResolvedAt     *time.Time `json:"resolved_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type ModerationResult struct {
+	ID           uint       `gorm:"primaryKey" json:"id"`
+	RequestID    string     `gorm:"uniqueIndex" json:"request_id"`
+	UserID       string     `gorm:"index" json:"user_id"`
+	Content      string     `gorm:"type:text" json:"content"`
+	Action       string     `gorm:"type:varchar(20)" json:"action"`
+	FinalAction  string     `gorm:"type:varchar(20)" json:"final_action"`
+	Status       string     `gorm:"type:varchar(30);index" json:"status"`
+	Reason       string     `gorm:"type:text" json:"reason"`
+	Source       string     `gorm:"type:varchar(30)" json:"source"`
+	Reviewer     string     `gorm:"type:varchar(64)" json:"reviewer"`
+	CallbackURL  string     `gorm:"type:text" json:"callback_url"`
+	DecisionAt   *time.Time `json:"decision_at"`
+	LastError    string     `gorm:"type:text" json:"last_error"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
 // PolicyVersion 定义策略版本
 type PolicyVersion struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
