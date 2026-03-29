@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -26,6 +27,7 @@ type Config struct {
 	ArkAPIKey              string   `mapstructure:"ARK_API_KEY"`
 	ArkModelID             string   `mapstructure:"ARK_MODEL_ID"`
 	ArkEmbeddingModel      string   `mapstructure:"ARK_EMBEDDING_MODEL"`
+	ArkEndpoint            string   `mapstructure:"ARK_ENDPOINT"` // Ark API Endpoint，如 arn:bc:ark:::v1/character/xxx
 	MilvusAddr             string   `mapstructure:"MILVUS_ADDR"`
 	EtcdEndpoints          []string `mapstructure:"ETCD_ENDPOINTS"`        // Etcd 地址列表
 	UseEtcdRegistry        bool     `mapstructure:"USE_ETCD_REGISTRY"`     // 是否使用 Etcd 服务注册
@@ -57,6 +59,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("ARK_API_KEY", "")
 	viper.SetDefault("ARK_MODEL_ID", "")
 	viper.SetDefault("ARK_EMBEDDING_MODEL", "")
+	viper.SetDefault("ARK_ENDPOINT", "")
 	viper.SetDefault("ETCD_ENDPOINTS", []string{"localhost:2379"})
 	viper.SetDefault("USE_ETCD_REGISTRY", false)
 	viper.SetDefault("JAEGER_ENDPOINT", "http://localhost:14268/api/traces") // Jaeger 默认地址
@@ -69,42 +72,11 @@ func LoadConfig() (*Config, error) {
 
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile != "" {
-		viper.SetConfigFile(configFile)
-		_ = viper.ReadInConfig()
+		if !readConfigAtPath(configFile) && !autoReadConfig() {
+			return nil, fmt.Errorf("无法加载配置文件: %s", configFile)
+		}
 	} else {
-		// 自动寻找配置文件
-		wd, _ := os.Getwd()
-		configs := []struct {
-			name string
-			ext  string
-		}{
-			{"config", "yaml"},
-			{"config", "yml"},
-			{".env", "env"},
-		}
-
-		found := false
-		curr := wd
-		for i := 0; i < 3; i++ {
-			for _, c := range configs {
-				path := filepath.Join(curr, c.name)
-				if c.ext != "env" {
-					path += "." + c.ext
-				}
-				if _, err := os.Stat(path); err == nil {
-					viper.SetConfigFile(path)
-					viper.SetConfigType(c.ext)
-					if err := viper.ReadInConfig(); err == nil {
-						found = true
-						break
-					}
-				}
-			}
-			if found {
-				break
-			}
-			curr = filepath.Dir(curr)
-		}
+		_ = autoReadConfig()
 	}
 
 	viper.AutomaticEnv()
@@ -117,4 +89,52 @@ func LoadConfig() (*Config, error) {
 		config.GatewayPort = config.ServerPort
 	}
 	return &config, nil
+}
+
+func readConfigAtPath(path string) bool {
+	if _, err := os.Stat(path); err == nil {
+		viper.SetConfigFile(path)
+		return viper.ReadInConfig() == nil
+	}
+	wd, _ := os.Getwd()
+	joined := filepath.Join(wd, path)
+	if _, err := os.Stat(joined); err == nil {
+		viper.SetConfigFile(joined)
+		return viper.ReadInConfig() == nil
+	}
+	return false
+}
+
+func autoReadConfig() bool {
+	wd, _ := os.Getwd()
+	configs := []struct {
+		name string
+		ext  string
+	}{
+		{"config", "yaml"},
+		{"config", "yml"},
+		{".env", "env"},
+	}
+	curr := wd
+	for i := 0; i < 5; i++ {
+		for _, c := range configs {
+			path := filepath.Join(curr, c.name)
+			if c.ext != "env" {
+				path += "." + c.ext
+			}
+			if _, err := os.Stat(path); err == nil {
+				viper.SetConfigFile(path)
+				viper.SetConfigType(c.ext)
+				if err := viper.ReadInConfig(); err == nil {
+					return true
+				}
+			}
+		}
+		next := filepath.Dir(curr)
+		if next == curr {
+			break
+		}
+		curr = next
+	}
+	return false
 }

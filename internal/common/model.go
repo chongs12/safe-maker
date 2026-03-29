@@ -35,13 +35,13 @@ const (
 
 // AuditLog 定义审计日志的数据库模型
 type AuditLog struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`    // 自增主键
-	RequestID string    `gorm:"index" json:"request_id"` // 请求 ID (建立索引以加速查询)
-	UserID    string    `json:"user_id"`                 // 用户 ID
-	Action    string    `json:"action"`                  // 动作 (allow, block, review)
-	Reason    string    `json:"reason"`                  // 原因
-	Source    string    `json:"source"`                  // 来源 (rule-engine, llm-agent)
-	CreatedAt time.Time `json:"created_at"`              // 创建时间
+	ID        uint      `gorm:"primaryKey" json:"id"`                     // 自增主键
+	RequestID string    `gorm:"type:varchar(64);index" json:"request_id"` // 请求 ID (建立索引以加速查询)
+	UserID    string    `gorm:"type:varchar(64)" json:"user_id"`          // 用户 ID
+	Action    string    `json:"action"`                                   // 动作 (allow, block, review)
+	Reason    string    `json:"reason"`                                   // 原因
+	Source    string    `json:"source"`                                   // 来源 (rule-engine, llm-agent)
+	CreatedAt time.Time `json:"created_at"`                               // 创建时间
 }
 
 // Rule 定义规则引擎的规则
@@ -71,8 +71,8 @@ type Case struct {
 
 // AuditTask 定义批量审核任务
 type AuditTask struct {
-	ID        string    `gorm:"primaryKey" json:"id"` // UUID
-	UserID    string    `gorm:"index" json:"user_id"`
+	ID        string    `gorm:"type:varchar(64);primaryKey" json:"id"` // UUID
+	UserID    string    `gorm:"type:varchar(64);index" json:"user_id"`
 	Status    string    `gorm:"type:varchar(20)" json:"status"` // "pending", "processing", "completed", "failed"
 	Total     int       `json:"total"`
 	Processed int       `json:"processed"`
@@ -82,9 +82,9 @@ type AuditTask struct {
 }
 
 type ReviewTask struct {
-	ID             string     `gorm:"primaryKey" json:"id"`
-	RequestID      string     `gorm:"index" json:"request_id"`
-	UserID         string     `gorm:"index" json:"user_id"`
+	ID             string     `gorm:"type:varchar(64);primaryKey" json:"id"`
+	RequestID      string     `gorm:"type:varchar(64);index" json:"request_id"`
+	UserID         string     `gorm:"type:varchar(64);index" json:"user_id"`
 	Content        string     `gorm:"type:text" json:"content"`
 	Status         string     `gorm:"type:varchar(20);index" json:"status"`
 	Source         string     `gorm:"type:varchar(30)" json:"source"`
@@ -99,21 +99,21 @@ type ReviewTask struct {
 }
 
 type ModerationResult struct {
-	ID           uint       `gorm:"primaryKey" json:"id"`
-	RequestID    string     `gorm:"uniqueIndex" json:"request_id"`
-	UserID       string     `gorm:"index" json:"user_id"`
-	Content      string     `gorm:"type:text" json:"content"`
-	Action       string     `gorm:"type:varchar(20)" json:"action"`
-	FinalAction  string     `gorm:"type:varchar(20)" json:"final_action"`
-	Status       string     `gorm:"type:varchar(30);index" json:"status"`
-	Reason       string     `gorm:"type:text" json:"reason"`
-	Source       string     `gorm:"type:varchar(30)" json:"source"`
-	Reviewer     string     `gorm:"type:varchar(64)" json:"reviewer"`
-	CallbackURL  string     `gorm:"type:text" json:"callback_url"`
-	DecisionAt   *time.Time `json:"decision_at"`
-	LastError    string     `gorm:"type:text" json:"last_error"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID          uint       `gorm:"primaryKey" json:"id"`
+	RequestID   string     `gorm:"type:varchar(64);uniqueIndex" json:"request_id"`
+	UserID      string     `gorm:"type:varchar(64);index" json:"user_id"`
+	Content     string     `gorm:"type:text" json:"content"`
+	Action      string     `gorm:"type:varchar(20)" json:"action"`
+	FinalAction string     `gorm:"type:varchar(20)" json:"final_action"`
+	Status      string     `gorm:"type:varchar(30);index" json:"status"`
+	Reason      string     `gorm:"type:text" json:"reason"`
+	Source      string     `gorm:"type:varchar(30)" json:"source"`
+	Reviewer    string     `gorm:"type:varchar(64)" json:"reviewer"`
+	CallbackURL string     `gorm:"type:text" json:"callback_url"`
+	DecisionAt  *time.Time `json:"decision_at"`
+	LastError   string     `gorm:"type:text" json:"last_error"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // PolicyVersion 定义策略版本
@@ -134,4 +134,29 @@ type PromptPolicy struct {
 	MaxTokens    *int     `json:"max_tokens,omitempty"`  // 最大 token 数
 	Tools        []string `json:"tools,omitempty"`       // 启用的工具列表
 	IsActive     bool     `json:"is_active"`             // 是否激活
+}
+
+// CallbackTask 回调任务 (用于异步回调重试机制)
+type CallbackTask struct {
+	ID           string     `gorm:"type:varchar(64);primaryKey" json:"id"`    // UUID
+	RequestID    string     `gorm:"type:varchar(64);index" json:"request_id"` // 关联的审核请求ID
+	CallbackURL  string     `gorm:"size:500" json:"callback_url"`             // 回调地址
+	Payload      string     `gorm:"type:text" json:"payload"`                 // JSON payload
+	RetryCount   int        `gorm:"default:0" json:"retry_count"`             // 当前重试次数
+	MaxRetries   int        `gorm:"default:3" json:"max_retries"`             // 最大重试次数
+	Status       string     `gorm:"type:varchar(20)" json:"status"`           // pending/success/failed
+	ResponseCode int        `json:"response_code"`                            // HTTP 响应码
+	ResponseBody string     `gorm:"type:text" json:"response_body"`           // 响应内容
+	LastTryAt    *time.Time `json:"last_try_at"`                              // 最后尝试时间
+	NextTryAt    *time.Time `json:"next_try_at"`                              // 下次尝试时间
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+// ReviewQueueStats 复审队列统计
+type ReviewQueueStats struct {
+	Total      int64 `json:"total"`
+	Pending    int64 `json:"pending"`
+	Processing int64 `json:"processing"`
+	Resolved   int64 `json:"resolved"`
 }

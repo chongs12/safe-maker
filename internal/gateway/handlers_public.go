@@ -260,13 +260,46 @@ func (s *Server) handleGetModeration(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "result not found"})
 		return
 	}
+
 	var reviewTask common.ReviewTask
-	taskResp := any(nil)
+	reviewTaskResp := map[string]any{}
 	if err := s.db.Where("request_id = ?", requestID).Order("created_at desc").First(&reviewTask).Error; err == nil {
-		taskResp = reviewTask
+		reviewTaskResp = map[string]any{
+			"id":              reviewTask.ID,
+			"status":          reviewTask.Status,
+			"reviewer":        reviewTask.Reviewer,
+			"final_action":    reviewTask.FinalAction,
+			"decision_reason": reviewTask.DecisionReason,
+			"claimed_at":      reviewTask.ClaimedAt,
+			"resolved_at":     reviewTask.ResolvedAt,
+		}
 	}
+
+	var callbackTasks []common.CallbackTask
+	s.db.Where("request_id = ?", requestID).Order("created_at desc").Find(&callbackTasks)
+	callbackResp := make([]map[string]any, 0, len(callbackTasks))
+	for _, ct := range callbackTasks {
+		callbackResp = append(callbackResp, map[string]any{
+			"id":            ct.ID,
+			"callback_url":  ct.CallbackURL,
+			"status":        ct.Status,
+			"retry_count":   ct.RetryCount,
+			"response_code": ct.ResponseCode,
+			"last_try_at":   ct.LastTryAt,
+			"next_try_at":   ct.NextTryAt,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"result":      result,
-		"review_task": taskResp,
+		"request_id":   result.RequestID,
+		"user_id":      result.UserID,
+		"content":      result.Content,
+		"action":       result.Action,
+		"final_action": result.FinalAction,
+		"status":       result.Status,
+		"reason":       result.Reason,
+		"source":       result.Source,
+		"review_task":  reviewTaskResp,
+		"callbacks":    callbackResp,
 	})
 }

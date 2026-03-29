@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"log"
+	"strings"
 
 	ark_embed "github.com/cloudwego/eino-ext/components/embedding/ark"
 	ark_model "github.com/cloudwego/eino-ext/components/model/ark"
@@ -38,10 +39,18 @@ type CheckPoliticalArgs struct {
 func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, *ark_model.ChatModel, *milvus2.Retriever, error) {
 	// 1. 初始化 Embedding (用于 Retriever)
 	// 使用火山引擎 Ark Embedding 服务
-	emb, err := ark_embed.NewEmbedder(ctx, &ark_embed.EmbeddingConfig{
+	embedCfg := &ark_embed.EmbeddingConfig{
 		APIKey: cfg.ArkAPIKey,
 		Model:  cfg.ArkEmbeddingModel,
-	})
+	}
+	if strings.TrimSpace(cfg.ArkEndpoint) != "" {
+		embedCfg.BaseURL = cfg.ArkEndpoint
+	}
+	if strings.TrimSpace(embedCfg.APIKey) == "" && strings.TrimSpace(cfg.VolcengineAccessKey) != "" && strings.TrimSpace(cfg.VolcengineSecretKey) != "" {
+		embedCfg.AccessKey = cfg.VolcengineAccessKey
+		embedCfg.SecretKey = cfg.VolcengineSecretKey
+	}
+	emb, err := ark_embed.NewEmbedder(ctx, embedCfg)
 	if err != nil {
 		log.Printf("警告: 初始化 embedding 失败: %v", err)
 	}
@@ -114,10 +123,18 @@ func NewEinoAgent(ctx context.Context, cfg *common.Config) (*EinoAgent, *ark_mod
 
 	// 4. 初始化 Chat Model (Ark)
 	// 使用火山引擎 Ark 大语言模型服务
-	chatModel, err := ark_model.NewChatModel(ctx, &ark_model.ChatModelConfig{
+	chatCfg := &ark_model.ChatModelConfig{
 		APIKey: cfg.ArkAPIKey,
 		Model:  cfg.ArkModelID,
-	})
+	}
+	if strings.TrimSpace(cfg.ArkEndpoint) != "" {
+		chatCfg.BaseURL = cfg.ArkEndpoint
+	}
+	if strings.TrimSpace(chatCfg.APIKey) == "" && strings.TrimSpace(cfg.VolcengineAccessKey) != "" && strings.TrimSpace(cfg.VolcengineSecretKey) != "" {
+		chatCfg.AccessKey = cfg.VolcengineAccessKey
+		chatCfg.SecretKey = cfg.VolcengineSecretKey
+	}
+	chatModel, err := ark_model.NewChatModel(ctx, chatCfg)
 	if err != nil {
 		return nil, nil, nil, err
 	}

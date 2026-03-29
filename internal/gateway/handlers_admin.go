@@ -30,8 +30,12 @@ func (s *Server) registerAdminRoutes(r *gin.Engine) {
 		admin.GET("/audits", s.handleListAudits)
 
 		admin.GET("/reviews", s.handleListReviews)
+		admin.GET("/reviews/stats", s.handleReviewStats)
 		admin.POST("/reviews/:id/claim", s.handleClaimReview)
 		admin.POST("/reviews/:id/decide", s.handleDecideReview)
+
+		admin.GET("/callbacks", s.handleListCallbacks)
+		admin.POST("/callbacks/:id/retry", s.handleRetryCallback)
 
 		admin.POST("/versions/snapshot", s.handleSnapshotVersion)
 
@@ -519,4 +523,50 @@ func (s *Server) handleStopSimulator(c *gin.Context) {
 
 func (s *Server) handleSimulatorStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, s.simulatorStatus())
+}
+
+func (s *Server) handleReviewStats(c *gin.Context) {
+	var stats common.ReviewQueueStats
+	s.db.Model(&common.ReviewTask{}).Count(&stats.Total)
+	s.db.Model(&common.ReviewTask{}).Where("status = ?", "pending").Count(&stats.Pending)
+	s.db.Model(&common.ReviewTask{}).Where("status = ?", "processing").Count(&stats.Processing)
+	s.db.Model(&common.ReviewTask{}).Where("status = ?", "resolved").Count(&stats.Resolved)
+	c.JSON(http.StatusOK, stats)
+}
+
+func (s *Server) handleListCallbacks(c *gin.Context) {
+	var tasks []common.CallbackTask
+	query := s.db.Model(&common.CallbackTask{}).Order("created_at desc")
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if requestID := c.Query("request_id"); requestID != "" {
+		query = query.Where("request_id = ?", requestID)
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	offset := (page - 1) * pageSize
+	var total int64
+	query.Count(&total)
+	query.Limit(pageSize).Offset(offset).Find(&tasks)
+	c.JSON(http.StatusOK, gin.H{
+		"total": total,
+		"page":  page,
+		"data":  tasks,
+	})
+}
+
+func (s *Server) handleRetryCallback(c *gin.Context) {
+	id := c.Param("id")
+	var task common.CallbackTask
+	if err := s.db.Where("id = ?", id).First(&task).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "callback task not found"})
+		return
+	}
+	if task.Status == "success" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "callback already succeeded, no need to retry"})
+		return
+	}
+	go s.executeCallbackWithRetry(task.ID, task.CallbackURL, []byte(task.Payload), 0)
+	c.JSON(http.StatusOK, gin.H{"message": "retry scheduled", "task_id": task.ID})
 }

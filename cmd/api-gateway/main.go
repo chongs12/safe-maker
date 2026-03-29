@@ -65,6 +65,7 @@ func main() {
 		&common.ReviewTask{},
 		&common.ModerationResult{},
 		&common.PolicyVersion{},
+		&common.CallbackTask{},
 	); err != nil {
 		logger.Fatal("数据库迁移失败", zap.Error(err))
 	}

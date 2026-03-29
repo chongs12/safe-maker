@@ -50,21 +50,79 @@ func (s *Server) sendCallback(callbackURL string, payload map[string]any) {
 	if strings.TrimSpace(callbackURL) == "" {
 		return
 	}
-	go func() {
-		body, _ := json.Marshal(payload)
-		req, err := http.NewRequest(http.MethodPost, callbackURL, bytes.NewReader(body))
-		if err != nil {
-			s.logger.Warn("构造回调请求失败", zap.Error(err), zap.String("callback_url", callbackURL))
-			return
+	requestID, _ := payload["request_id"].(string)
+	payloadBytes, _ := json.Marshal(payload)
+
+	task := &common.CallbackTask{
+		ID:          uuid.New().String(),
+		RequestID:   requestID,
+		CallbackURL: callbackURL,
+		Payload:     string(payloadBytes),
+		Status:      "pending",
+		MaxRetries:  3,
+	}
+	_ = s.db.Create(task)
+
+	go s.executeCallbackWithRetry(task.ID, callbackURL, payloadBytes, 0)
+}
+
+func (s *Server) executeCallbackWithRetry(taskID, callbackURL string, body []byte, retryCount int) {
+	maxRetries := 3
+	backoff := []time.Duration{1 * time.Minute, 5 * time.Minute, 30 * time.Minute}
+
+	req, err := http.NewRequest(http.MethodPost, callbackURL, bytes.NewReader(body))
+	if err != nil {
+		s.logger.Warn("构造回调请求失败", zap.Error(err), zap.String("callback_url", callbackURL))
+		s.updateCallbackTask(taskID, "failed", 0, err.Error())
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		s.logger.Warn("回调请求失败", zap.Error(err), zap.String("callback_url", callbackURL))
+		if retryCount < maxRetries {
+			s.updateCallbackTask(taskID, "pending", retryCount+1, err.Error())
+			time.Sleep(backoff[retryCount])
+			go s.executeCallbackWithRetry(taskID, callbackURL, body, retryCount+1)
+		} else {
+			s.updateCallbackTask(taskID, "failed", retryCount, err.Error())
 		}
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := s.httpClient.Do(req)
-		if err != nil {
-			s.logger.Warn("回调请求失败", zap.Error(err), zap.String("callback_url", callbackURL))
-			return
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		s.updateCallbackTask(taskID, "success", retryCount, "")
+		s.logger.Info("回调成功", zap.String("callback_url", callbackURL), zap.Int("status_code", resp.StatusCode))
+	} else {
+		s.logger.Warn("回调返回错误状态码", zap.String("callback_url", callbackURL), zap.Int("status_code", resp.StatusCode))
+		if retryCount < maxRetries {
+			s.updateCallbackTask(taskID, "pending", retryCount+1, "")
+			time.Sleep(backoff[retryCount])
+			go s.executeCallbackWithRetry(taskID, callbackURL, body, retryCount+1)
+		} else {
+			s.updateCallbackTask(taskID, "failed", retryCount, "")
 		}
-		_ = resp.Body.Close()
-	}()
+	}
+}
+
+func (s *Server) updateCallbackTask(taskID, status string, retryCount int, lastError string) {
+	now := time.Now()
+	updates := map[string]any{
+		"status":      status,
+		"retry_count": retryCount,
+		"last_try_at": now,
+	}
+	if status == "failed" {
+		updates["response_body"] = lastError
+	}
+	if status == "pending" && retryCount > 0 {
+		backoff := []time.Duration{1 * time.Minute, 5 * time.Minute, 30 * time.Minute}
+		nextTry := now.Add(backoff[retryCount-1])
+		updates["next_try_at"] = nextTry
+	}
+	_ = s.db.Model(&common.CallbackTask{}).Where("id = ?", taskID).Updates(updates)
 }
 
 func (s *Server) createReviewTask(requestID, userID, content, reason, source, callbackURL string) (*common.ReviewTask, error) {

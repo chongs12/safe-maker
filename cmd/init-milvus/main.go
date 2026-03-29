@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strings"
 
 	ark_embed "github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
@@ -43,10 +44,18 @@ func main() {
 	defer c.Close()
 
 	// 2. 初始化 Embedder (用于将文本转换为向量)
-	emb, err := ark_embed.NewEmbedder(ctx, &ark_embed.EmbeddingConfig{
+	embedCfg := &ark_embed.EmbeddingConfig{
 		APIKey: cfg.ArkAPIKey,
 		Model:  cfg.ArkEmbeddingModel,
-	})
+	}
+	if strings.TrimSpace(cfg.ArkEndpoint) != "" {
+		embedCfg.BaseURL = cfg.ArkEndpoint
+	}
+	if strings.TrimSpace(embedCfg.APIKey) == "" && strings.TrimSpace(cfg.VolcengineAccessKey) != "" && strings.TrimSpace(cfg.VolcengineSecretKey) != "" {
+		embedCfg.AccessKey = cfg.VolcengineAccessKey
+		embedCfg.SecretKey = cfg.VolcengineSecretKey
+	}
+	emb, err := ark_embed.NewEmbedder(ctx, embedCfg)
 	if err != nil {
 		log.Fatal("初始化 embedder 失败:", err)
 	}
@@ -116,7 +125,10 @@ func main() {
 	}
 
 	// 5. 加载数据 (cases.json)
-	file, err := os.ReadFile("../../assets/examples/cases.json")
+	file, err := os.ReadFile("assets/examples/cases.json")
+	if err != nil {
+		file, err = os.ReadFile("../../assets/examples/cases.json")
+	}
 	if err != nil {
 		log.Fatal("读取 cases.json 失败:", err)
 	}
