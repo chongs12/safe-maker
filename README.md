@@ -1,32 +1,10 @@
 # SafeFlow — Enterprise Content Safety Platform with Kitex & Eino
 
-> **Next-Gen Content Moderation Platform powered by CloudWeGo Ecosystem (Kitex + Eino) and Volcano Engine.**
+> **Next-Gen Content Moderation Platform powered by CloudWeGo Ecosystem (Kitex + Eino) and Volcano Engine.由 CloudWeGo 生态系统（Kitex、Eino）和火山引擎驱动的下一代内容审核平台。**
 
 SafeFlow 是一个企业级智能内容安全平台，演示了如何使用字节跳动开源的 CloudWeGo 生态构建高性能、可扩展的 AI 应用。它集成了 **Kitex** 微服务框架和 **Eino** AI 应用框架，并利用 **Milvus** 向量数据库和 **火山引擎 (Volcano Engine)** 的 Ark 大模型服务，实现了基于 RAG 和 Agent 的深度内容审核。
 
-## 🏗 架构设计
 
-SafeFlow 从传统的事件驱动架构演进为高性能的 RPC 微服务架构，结合了规则引擎的极速响应和 LLM Agent 的深度推理能力。
-
-```mermaid
-graph TD
-    User[User] -->|POST /submit| Gateway[API Gateway (Gin)]
-    Gateway -->|RPC (Kitex)| RuleEngine[Rule Engine Service]
-    
-    RuleEngine -- Match? -->|Block| Gateway
-    RuleEngine -- Pass -->|RPC (Kitex)| LLMAgent[LLM Agent Service]
-    
-    subgraph Eino Agent Logic
-        LLMAgent -->|Eino Graph| Agent[Eino ReAct Agent]
-        Agent -->|Retrieve| Milvus[Milvus Vector DB]
-        Agent -->|Embed/Chat| Ark[Volcano Engine Ark]
-    end
-    
-    Gateway -.->|Async Event (NATS)| Audit[Audit Service]
-    Audit -->|Write| MySQL[(MySQL)]
-    
-    Gateway -->|Response| User
-```
 
 ### 核心技术栈
 
@@ -68,14 +46,14 @@ graph TD
 
 1. **配置环境变量**:
    修改 `docker-compose.yml` 或设置环境变量：
-   ```bash
+   ```bash   ”“bash
    export ARK_API_KEY="your_volc_api_key"
    export ARK_MODEL_ID="your_endpoint_id_for_chat"
    export ARK_EMBEDDING_MODEL="your_endpoint_id_for_embedding"
    ```
 
 2. **启动基础设施**:
-   ```bash
+   ```bash   ”“bash
    docker-compose up -d etcd minio milvus nats mysql
    ```
    *等待 Milvus 启动完成 (约 30-60 秒).*
