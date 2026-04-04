@@ -5,7 +5,7 @@ RULE_ENGINE_PORT: "8881"
 LLM_AGENT_PORT: "8882"
 RULE_ENGINE_ADDR: localhost:8881
 LLM_AGENT_ADDR: localhost:8882
-ARK_API_KEY: "8de95fa8-fc30-4f28-b254-55afb5fb7505"
+ARK_API_KEY: ""
 ARK_MODEL_ID: "doubao-seed-2-0-lite-260215"
 ARK_EMBEDDING_MODEL: "doubao-embedding-large-text-240915"
 ARK_ENDPOINT: "https://ark.cn-beijing.volces.com/api/v3"  # 添加这行
